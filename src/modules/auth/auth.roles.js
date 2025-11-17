@@ -1,17 +1,21 @@
 module.exports.allowRoles = (...allowedRoles) => {
   return (req, res, next) => {
     try {
-      const userRoles = req.user?.roles || [];
+      if (!req.user || !req.user.role) {
+        const error = new Error("Authentication required.");
+        error.statusCode = 401;
+        throw error;
+      }
 
-      const isAllowed = userRoles.some(role => allowedRoles.includes(role));
-
-      if (!isAllowed) {
-        return res.status(403).json({ message: "Forbidden: insufficient permissions" });
+      if (!allowedRoles.includes(req.user.role)) {
+        const error = new Error("You do not have permission to access this resource.");
+        error.statusCode = 403;
+        throw error;
       }
 
       next();
     } catch (err) {
-      return res.status(500).json({ message: "Authorization error" });
+      next(err);
     }
   };
 };
