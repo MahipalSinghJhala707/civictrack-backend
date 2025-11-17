@@ -21,17 +21,14 @@ module.exports = (sequelize, DataTypes) => {
     role_id: {
       type: DataTypes.BIGINT,
       allowNull: false
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     sequelize,
     modelName: 'UserRole',
     tableName: 'user_role',
     underscored: true,
-    timestamps: true
+    timestamps: true,
+    paranoid: true
   });
 
   return UserRole;

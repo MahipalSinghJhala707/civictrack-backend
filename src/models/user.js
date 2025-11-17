@@ -51,17 +51,14 @@ module.exports = (sequelize, DataTypes) => {
     password_hash: {
       type: DataTypes.STRING(255),
       allowNull: false
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     sequelize,
     modelName: 'User',
     tableName: 'users',
     underscored: true,
-    timestamps: true
+    timestamps: true,
+    paranoid: true
   });
 
   return User;

@@ -41,10 +41,6 @@ module.exports = (sequelize, DataTypes) => {
     comment: {
       type: DataTypes.TEXT,
       allowNull: true
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     sequelize,
@@ -52,6 +48,7 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'logs',
     underscored: true,
     timestamps: true,
+    paranoid: true,
     indexes: [
       { fields: ['issue_id'], name: 'idx_logs_issue_id' }
     ]

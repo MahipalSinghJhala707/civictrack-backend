@@ -82,10 +82,6 @@ module.exports = (sequelize, DataTypes) => {
     is_hidden: {
       type: DataTypes.BOOLEAN,
       defaultValue: false
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     sequelize,
@@ -93,6 +89,7 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'user_issue',
     underscored: true,
     timestamps: true,
+    paranoid: true,
     indexes: [
       { fields: ['status'], name: 'idx_user_issue_status' },
       { fields: ['authority_id'], name: 'idx_user_issue_authority' }

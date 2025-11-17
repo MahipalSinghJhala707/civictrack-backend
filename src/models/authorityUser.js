@@ -30,17 +30,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.BIGINT,
       allowNull: false,
       unique: true
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     sequelize,
     modelName: 'AuthorityUser',
     tableName: 'authority_user',
     underscored: true,
-    timestamps: true
+    timestamps: true,
+    paranoid: true
   });
 
   return AuthorityUser;

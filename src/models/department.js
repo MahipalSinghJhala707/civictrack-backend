@@ -24,17 +24,14 @@ module.exports = (sequelize, DataTypes) => {
     description: {
       type: DataTypes.TEXT,
       allowNull: true
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     sequelize,
     modelName: 'Department',
     tableName: 'departments',
     underscored: true,
-    timestamps: true
+    timestamps: true,
+    paranoid: true
   });
 
   return Department;

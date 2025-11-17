@@ -38,10 +38,6 @@ module.exports = (sequelize, DataTypes) => {
     flag_id: {
       type: DataTypes.BIGINT,
       allowNull: false
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     sequelize,
@@ -49,6 +45,7 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'user_issue_flag',
     underscored: true,
     timestamps: true,
+    paranoid: true,
     indexes: [
       { fields: ['report_id'], name: 'idx_user_issue_flag_report_id' }
     ]

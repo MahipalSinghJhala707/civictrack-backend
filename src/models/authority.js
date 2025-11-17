@@ -46,17 +46,14 @@ module.exports = (sequelize, DataTypes) => {
     address: {
       type: DataTypes.TEXT,
       allowNull: true
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     sequelize,
     modelName: 'Authority',
     tableName: 'authorities',
     underscored: true,
-    timestamps: true
+    timestamps: true,
+    paranoid: true
   });
 
   return Authority;

@@ -24,10 +24,6 @@ module.exports = (sequelize, DataTypes) => {
     url: {
       type: DataTypes.TEXT,
       allowNull: false
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     sequelize,
@@ -35,6 +31,7 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'issue_images',
     underscored: true,
     timestamps: true,
+    paranoid: true,
     indexes: [
       { fields: ['report_id'], name: 'idx_issue_images_report_id' }
     ]

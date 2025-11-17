@@ -30,17 +30,14 @@ module.exports = (sequelize, DataTypes) => {
     is_active: {
       type: DataTypes.BOOLEAN,
       defaultValue: true
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     sequelize,
     modelName: 'Role',
     tableName: 'roles',
     underscored: true,
-    timestamps: true
+    timestamps: true,
+    paranoid: true
   });
 
   return Role;
