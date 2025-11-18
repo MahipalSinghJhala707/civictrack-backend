@@ -1,25 +1,19 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const {  User, UserRole, Role, sequelize} = require("../../models");
+const { User, UserRole, Role, sequelize } = require("../../models");
 
 module.exports = {
- 
   async register({ name, email, password }) {
-    if (!name || !email || !password) {
-      const err = new Error("Name, email and password are required.");
-      err.statusCode = 400;
-      throw err;
-    }
-
-    const existing = await User.findOne({ where: { email } });
-    if (existing) {
-      const err = new Error("This email is already registered.");
-      err.statusCode = 409;
-      throw err;
-    }
-
     const t = await sequelize.transaction();
+
     try {
+      const existing = await User.findOne({ where: { email } });
+      if (existing) {
+        const err = new Error("This email is already registered.");
+        err.statusCode = 409;
+        throw err;
+      }
+
       const hashedPassword = await bcrypt.hash(password, 10);
 
       const user = await User.create(
@@ -27,10 +21,9 @@ module.exports = {
         { transaction: t }
       );
 
-      // default role citizen
       const citizenRole = await Role.findOne({ where: { name: "citizen" } });
       if (!citizenRole) {
-        const err = new Error("Default role missing in the system.");
+        const err = new Error("Default role 'citizen' missing in the system.");
         err.statusCode = 500;
         throw err;
       }
@@ -42,23 +35,15 @@ module.exports = {
 
       await t.commit();
       return user;
+
     } catch (err) {
       await t.rollback();
-      if (err.statusCode) throw err;
-      const wrap = new Error(err.message || "Registration failed.");
-      wrap.statusCode = err.statusCode || 500;
-      throw wrap;
+      if (!err.statusCode) err.statusCode = 500;
+      throw err;
     }
   },
 
-
   async login({ email, password, role }) {
-    if (!email || !password || !role) {
-      const err = new Error("Email, password and role are required.");
-      err.statusCode = 400;
-      throw err;
-    }
-
     try {
       const user = await User.findOne({ where: { email } });
       if (!user) {
@@ -98,11 +83,10 @@ module.exports = {
       );
 
       return { user, token };
+
     } catch (err) {
-      if (err.statusCode) throw err;
-      const wrap = new Error(err.message || "Login failed.");
-      wrap.statusCode = 500;
-      throw wrap;
+      if (!err.statusCode) err.statusCode = 500;
+      throw err;
     }
   }
 };

@@ -4,12 +4,14 @@ module.exports = {
   async register(req, res, next) {
     try {
       const user = await AuthService.register(req.body);
+
       return res.status(201).json({
+        success: true,
         message: "Registered successfully.",
-        user
+        data: { user }
       });
     } catch (err) {
-      next(err); // send to global error middleware
+      next(err);
     }
   },
 
@@ -20,13 +22,14 @@ module.exports = {
       res.cookie("token", token, {
         httpOnly: true,
         sameSite: "lax",
-        secure: false, // true in production
-        maxAge: 24 * 60 * 60 * 1000 // 1 day
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 24 * 60 * 60 * 1000
       });
 
-      return res.json({
+      return res.status(200).json({
+        success: true,
         message: "Login successful.",
-        user
+        data: { user }
       });
     } catch (err) {
       next(err);
@@ -38,10 +41,14 @@ module.exports = {
       res.cookie("token", "", {
         httpOnly: true,
         sameSite: "lax",
-        expires: new Date(0) 
+        expires: new Date(0)
       });
 
-      return res.json({ message: "Logged out successfully." });
+      return res.status(200).json({
+        success: true,
+        message: "Logged out successfully."
+      });
+
     } catch (err) {
       next(err);
     }
@@ -49,7 +56,10 @@ module.exports = {
 
   async me(req, res, next) {
     try {
-      return res.json({ user: req.user });
+      return res.status(200).json({
+        success: true,
+        data: { user: req.user }
+      });
     } catch (err) {
       next(err);
     }

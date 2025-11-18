@@ -5,9 +5,9 @@ module.exports = (req, res, next) => {
     const token = req.cookies?.token;
 
     if (!token) {
-      const error = new Error("Authentication required.");
-      error.statusCode = 401;
-      throw error;
+      const err = new Error("Authentication required.");
+      err.statusCode = 401;
+      throw err;
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
