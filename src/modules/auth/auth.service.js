@@ -1,5 +1,6 @@
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
+const { EncryptJWT } = require("jose");
+const crypto = require("crypto");
 const { User, UserRole, Role, sequelize } = require("../../models");
 
 module.exports = {
@@ -76,11 +77,31 @@ module.exports = {
         throw err;
       }
 
-      const token = jwt.sign(
-        { id: user.id, role },
+      // Ensure JWT_SECRET is configured
+      if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim() === "") {
+        const err = new Error("JWT secret key is not configured.");
+        err.statusCode = 500;
+        throw err;
+      }
+
+      // Create encrypted token using JWE (JSON Web Encryption)
+      // The payload is encrypted with AES-256-GCM, so it CANNOT be decoded without the secret
+      // This provides encryption (payload hidden) and integrity protection
+      // Derive a 32-byte (256-bit) key from JWT_SECRET using PBKDF2
+      // This ensures the key is exactly 32 bytes as required by AES-256-GCM
+      const secretKey = crypto.pbkdf2Sync(
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || "1d" }
+        "civictrack-salt", // Salt for key derivation
+        100000, // Iterations
+        32, // 32 bytes = 256 bits for AES-256
+        "sha256"
       );
+      
+      const token = await new EncryptJWT({ id: user.id, role })
+        .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
+        .setIssuedAt()
+        .setExpirationTime(process.env.JWT_EXPIRES_IN || "1d")
+        .encrypt(secretKey);
 
       return { user, token };
 
