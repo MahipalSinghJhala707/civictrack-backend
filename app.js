@@ -3,8 +3,9 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 
 const authRoutes = require("./src/modules/auth/auth.route.js");
+const adminRoutes = require("./src/modules/admin/admin.route.js");
+const issueRoutes = require("./src/modules/issue/issue.route.js");
 const errorHandler = require("./src/shared/middleware/error.middleware.js");
-
 const app = express();
 
 app.use(express.json());
@@ -16,9 +17,13 @@ app.use(
   })
 );
 
-app.get("/", (req, res) => res.json({ message: "API is running..." }));
+app.get("/", (req, res) => {
+  res.json({ message: "API is running..." });
+});
 
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/issues", issueRoutes);
 
 app.use(errorHandler);
 

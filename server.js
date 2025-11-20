@@ -4,14 +4,33 @@ const { sequelize } = require("./src/models");
 
 const PORT = process.env.PORT || 8080;
 
+// Validate required environment variables
+function validateEnv() {
+  const required = ["JWT_SECRET", "DB_NAME", "DB_USER", "DB_PASS", "DB_HOST"];
+  const missing = required.filter(key => !process.env[key] || process.env[key].trim() === "");
+
+  if (missing.length > 0) {
+    console.error("❌ Missing required environment variables:", missing.join(", "));
+    console.error("Please check your .env file");
+    process.exit(1);
+  }
+
+  // Validate JWT_SECRET strength
+  if (process.env.JWT_SECRET.length < 32) {
+    console.warn("⚠️  WARNING: JWT_SECRET should be at least 32 characters long for security");
+  }
+}
 
 async function startServer() {
   try {
+    // Validate environment variables before starting
+    validateEnv();
+
     await sequelize.authenticate();
     console.log("Database connected");
 
-    await sequelize.sync({ alter: true });
-    console.log("Models synced");
+    // Note: Database schema is managed through migrations
+    // Run migrations with: npm run migrate
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
