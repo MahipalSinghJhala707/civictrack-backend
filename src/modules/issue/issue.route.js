@@ -10,7 +10,8 @@ const {
   createReportValidator,
   updateStatusValidator,
   flagReportValidator,
-  toggleVisibilityValidator
+  toggleVisibilityValidator,
+  reportIdParamValidator
 } = require("./issue.validator.js");
 
 // Public routes - no authentication required
@@ -31,6 +32,19 @@ router.post(
 
 router.get("/reports", IssueController.listReports);
 
+router.get(
+  "/reports/flagged",
+  allowRoles("admin"),
+  IssueController.listFlaggedReports
+);
+
+router.get(
+  "/reports/:reportId",
+  reportIdParamValidator,
+  validate,
+  IssueController.getReportById
+);
+
 router.patch(
   "/reports/:reportId/status",
   allowRoles("authority", "admin"),
@@ -45,12 +59,6 @@ router.post(
   flagReportValidator,
   validate,
   IssueController.flagReport
-);
-
-router.get(
-  "/reports/flagged",
-  allowRoles("admin"),
-  IssueController.listFlaggedReports
 );
 
 router.patch(

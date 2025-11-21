@@ -262,6 +262,35 @@ module.exports = {
     });
   },
 
+  async getReportById(reportId, user) {
+    const report = await UserIssue.findByPk(reportId, {
+      include: [...baseReportInclude, flagInclude]
+    });
+
+    if (!report) {
+      throw toNotFoundError("Issue report not found.");
+    }
+
+    if (user.role === "citizen") {
+      if (report.is_hidden && report.reporter_id !== user.id) {
+        throw toForbiddenError("You do not have access to this report.");
+      }
+      return report;
+    } else if (user.role === "authority") {
+      const authorityUser = await AuthorityUser.findOne({
+        where: { user_id: user.id }
+      });
+      if (!authorityUser || authorityUser.authority_id !== report.authority_id) {
+        throw toForbiddenError("You do not have access to this report.");
+      }
+      return report;
+    } else if (user.role === "admin") {
+      return report;
+    } else {
+      throw toForbiddenError("Unsupported role for accessing reports.");
+    }
+  },
+
   async updateStatus(reportId, { status, comment }, user) {
     const report = await UserIssue.findByPk(reportId);
     if (!report) {

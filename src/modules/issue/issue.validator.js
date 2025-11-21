@@ -59,3 +59,7 @@ exports.toggleVisibilityValidator = [
     .withMessage("isHidden must be a boolean value")
 ];
 
+exports.reportIdParamValidator = [
+  param("reportId").isInt({ min: 1 }).withMessage("reportId must be numeric")
+];
+

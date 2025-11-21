@@ -65,6 +65,20 @@ module.exports = {
     }
   },
 
+  async getReportById(req, res, next) {
+    try {
+      const reportId = Number(req.params.reportId);
+      const report = await IssueService.getReportById(reportId, req.user);
+
+      return res.status(200).json({
+        success: true,
+        data: { report }
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async updateStatus(req, res, next) {
     try {
       const reportId = Number(req.params.reportId);
