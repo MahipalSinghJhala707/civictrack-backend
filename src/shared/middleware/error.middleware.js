@@ -5,13 +5,8 @@ module.exports = (err, req, res, next) => {
     console.error(err);
   }
 
-  let statusCode = err.statusCode || 500;
-  let message = err.message;
-
-  if (err.code === 'EBADCSRFTOKEN') {
-    statusCode = 403;
-    message = 'Invalid CSRF token. Please refresh the page and try again.';
-  }
+  const statusCode = err.statusCode || 500;
+  const message = err.message;
   
   const response = {
     success: false,

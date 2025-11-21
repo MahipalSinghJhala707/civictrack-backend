@@ -1,7 +1,6 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
-const csrf = require('csurf');
 
 const authRoutes = require("./src/modules/auth/auth.route.js");
 const adminRoutes = require("./src/modules/admin/admin.route.js");
@@ -36,36 +35,13 @@ app.use(
 
 app.use(apiLimiter);
 
-const csrfProtection = csrf({ 
-  cookie: {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production'
-  }
-});
-
 app.get("/", (req, res) => {
   res.json({ message: "API is running..." });
 });
 
-app.get("/api/csrf-token", csrfProtection, (req, res) => {
-  res.json({ 
-    success: true,
-    csrfToken: req.csrfToken() 
-  });
-});
-
 app.use("/api/auth", authRoutes);
-
-const csrfMiddleware = (req, res, next) => {
-  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-    return next();
-  }
-  return csrfProtection(req, res, next);
-};
-
-app.use("/api/admin", csrfMiddleware, adminRoutes);
-app.use("/api/issues", csrfMiddleware, issueRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/issues", issueRoutes);
 
 app.use(errorHandler);
 
