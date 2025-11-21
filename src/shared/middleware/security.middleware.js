@@ -8,7 +8,6 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
-  trustProxy: true,
 });
 
 const apiLimiter = rateLimit({
@@ -17,7 +16,6 @@ const apiLimiter = rateLimit({
   message: 'Too many requests, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  trustProxy: true,
 });
 
 const securityHeaders = helmet({
