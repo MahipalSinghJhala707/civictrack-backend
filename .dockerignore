@@ -5,7 +5,6 @@ npm-debug.log
 !.env.sample
 .git
 .gitignore
-README.md
 *.md
 .vscode
 .idea
@@ -13,5 +12,4 @@ coverage
 .nyc_output
 *.log
 tests
-docker-compose.dev.yml
-Dockerfile.dev
+docker-compose.yml

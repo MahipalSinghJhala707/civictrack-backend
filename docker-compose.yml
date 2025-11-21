@@ -1,31 +1,10 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: civictrack-backend
-    environment:
-      NODE_ENV: ${NODE_ENV:-production}
-      PORT: ${PORT:-8080}
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT:-5432}
-      DB_USER: ${DB_USER}
-      DB_PASS: ${DB_PASS}
-      DB_NAME: ${DB_NAME}
-      DB_DIALECT: postgres
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_SALT: ${JWT_SALT}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-2h}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
-      AWS_REGION: ${AWS_REGION:-}
-      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_S3_BASE_URL: ${AWS_S3_BASE_URL:-}
-      AWS_S3_ACL: ${AWS_S3_ACL:-public-read}
-      ISSUE_REPORT_MAX_IMAGES: ${ISSUE_REPORT_MAX_IMAGES:-5}
-      ISSUE_IMAGE_MAX_MB: ${ISSUE_IMAGE_MAX_MB:-5}
+    env_file:
+      - .env
     ports:
-      - "${PORT:-8080}:8080"
+      - "8080:8080"
     restart: unless-stopped
 
