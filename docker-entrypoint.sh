@@ -1,13 +1,13 @@
 #!/bin/sh
 set -e
 
-echo "🚀 Starting CivicTrack Backend..."
+echo "Starting CivicTrack Backend..."
 
-echo "📦 Running database migrations..."
+echo "Running database migrations..."
 npm run migrate || {
-  echo "⚠️  Migration failed, but continuing..."
+  echo "Migration failed, but continuing..."
 }
 
-echo "✅ Starting application..."
+echo "Starting application..."
 exec node server.js
 

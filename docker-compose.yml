@@ -1,25 +1,4 @@
-version: '3.8'
-
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: civictrack-db
-    environment:
-      POSTGRES_USER: ${DB_USER:-civictrack}
-      POSTGRES_PASSWORD: ${DB_PASS:-civictrack123}
-      POSTGRES_DB: ${DB_NAME:-civictrack}
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-civictrack}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - civictrack-network
-
   app:
     build:
       context: .
@@ -28,11 +7,11 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${PORT:-8080}
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-civictrack}
-      DB_PASS: ${DB_PASS:-civictrack123}
-      DB_NAME: ${DB_NAME:-civictrack}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
       DB_DIALECT: postgres
       JWT_SECRET: ${JWT_SECRET}
       JWT_SALT: ${JWT_SALT}
@@ -48,17 +27,5 @@ services:
       ISSUE_IMAGE_MAX_MB: ${ISSUE_IMAGE_MAX_MB:-5}
     ports:
       - "${PORT:-8080}:8080"
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - civictrack-network
     restart: unless-stopped
-
-volumes:
-  postgres_data:
-
-networks:
-  civictrack-network:
-    driver: bridge
 

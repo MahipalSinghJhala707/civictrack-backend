@@ -12,14 +12,6 @@ README.md
 coverage
 .nyc_output
 *.log
-package-lock.json
 tests
-BRANCH_SPLIT_PLAN.md
-PR_DESCRIPTIONS.md
-SECURITY_AUDIT.md
-SECURITY_FIXES_EXPLAINED.md
-DOCKER.md
-create-feature-branches.sh
-verify-branch-coverage.sh
 docker-compose.dev.yml
 Dockerfile.dev
