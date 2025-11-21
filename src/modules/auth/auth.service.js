@@ -89,14 +89,7 @@ module.exports = {
       // This provides encryption (payload hidden) and integrity protection
       // Derive a 32-byte (256-bit) key from JWT_SECRET using PBKDF2
       // This ensures the key is exactly 32 bytes as required by AES-256-GCM
-      // Use environment variable for salt, fallback only for development
-      const salt = process.env.JWT_SALT || (process.env.NODE_ENV === 'production' ? null : "civictrack-salt");
-      if (!salt) {
-        const err = new Error("JWT salt is not configured.");
-        err.statusCode = 500;
-        throw err;
-      }
-      
+      const salt = process.env.JWT_SALT || "civictrack-salt";
       const secretKey = crypto.pbkdf2Sync(
         process.env.JWT_SECRET,
         salt,
@@ -108,7 +101,7 @@ module.exports = {
       const token = await new EncryptJWT({ id: user.id, role })
         .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
         .setIssuedAt()
-        .setExpirationTime(process.env.JWT_EXPIRES_IN || "1d")
+        .setExpirationTime(process.env.JWT_EXPIRES_IN || "2h")
         .encrypt(secretKey);
 
       return { user, token };

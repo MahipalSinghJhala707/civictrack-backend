@@ -11,6 +11,8 @@ const { securityHeaders, apiLimiter } = require("./src/shared/middleware/securit
 
 const app = express();
 
+app.set('trust proxy', true);
+
 app.use(securityHeaders);
 
 app.use(express.json({ limit: '10mb' }));
@@ -20,11 +22,13 @@ const allowedOrigins = process.env.FRONTEND_ORIGIN?.split(',').map(origin => ori
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+      if (!origin) {
+        return callback(null, true);
       }
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error('Not allowed by CORS'));
     },
     credentials: true
   })
