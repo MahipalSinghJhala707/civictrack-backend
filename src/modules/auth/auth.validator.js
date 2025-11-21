@@ -3,11 +3,13 @@ const { body } = require("express-validator");
 const VALID_ROLES = ["citizen", "authority", "admin"];
 
 exports.registerValidator = [
-  body("name").trim().notEmpty().withMessage("Name is required"),
+  body("name").trim().notEmpty().escape().withMessage("Name is required"),
   body("email").trim().isEmail().withMessage("A valid email is required"),
   body("password")
-    .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters")
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage("Password must contain at least one uppercase letter, one lowercase letter, and one number")
 ];
 
 exports.loginValidator = [

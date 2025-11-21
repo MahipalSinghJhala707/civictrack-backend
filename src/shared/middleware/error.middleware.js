@@ -1,10 +1,19 @@
 module.exports = (err, req, res, next) => {
-  // Don't log 401 (authentication) errors as they're expected for protected routes
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
   if (err.statusCode !== 401) {
-  console.error(err);
+    console.error(err);
   }
 
-  return res.status(err.statusCode || 500).json({
-    message: err.message || "Internal server error"
-  });
+  const statusCode = err.statusCode || 500;
+  
+  const response = {
+    message: isDevelopment ? err.message : (err.statusCode ? err.message : 'An error occurred')
+  };
+
+  if (isDevelopment && err.stack) {
+    response.stack = err.stack;
+  }
+
+  return res.status(statusCode).json(response);
 };

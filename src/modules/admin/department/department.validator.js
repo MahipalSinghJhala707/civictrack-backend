@@ -7,7 +7,7 @@ exports.departmentIdParamValidator = [
 ];
 
 exports.createDepartmentValidator = [
-  body("name").trim().notEmpty().withMessage("Name is required"),
+  body("name").trim().notEmpty().escape().withMessage("Name is required"),
   body("description")
     .optional({ values: "falsy" })
     .trim()

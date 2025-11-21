@@ -3,8 +3,8 @@ const { body, param } = require("express-validator");
 const STATUS_VALUES = ["reported", "in_progress", "resolved", "rejected"];
 
 exports.createReportValidator = [
-  body("title").trim().notEmpty().withMessage("Title is required"),
-  body("description").trim().notEmpty().withMessage("Description is required"),
+  body("title").trim().notEmpty().escape().withMessage("Title is required"),
+  body("description").trim().notEmpty().escape().withMessage("Description is required"),
   body("issueId")
     .isInt({ min: 1 })
     .withMessage("A valid issue category is required"),

@@ -7,9 +7,9 @@ exports.authorityIdParamValidator = [
 ];
 
 exports.createAuthorityValidator = [
-  body("name").trim().notEmpty().withMessage("Name is required"),
-  body("city").trim().notEmpty().withMessage("City is required"),
-  body("region").trim().notEmpty().withMessage("Region is required"),
+  body("name").trim().notEmpty().escape().withMessage("Name is required"),
+  body("city").trim().notEmpty().escape().withMessage("City is required"),
+  body("region").trim().notEmpty().escape().withMessage("Region is required"),
   body("departmentId")
     .optional({ values: "falsy" })
     .isInt({ min: 1 })

@@ -32,9 +32,17 @@ module.exports = async (req, res, next) => {
     // This provides encryption (payload hidden) and integrity protection
     // Derive the same 32-byte (256-bit) key from JWT_SECRET using PBKDF2
     // This must match the key derivation used during encryption
+    // Use environment variable for salt, fallback only for development
+    const salt = process.env.JWT_SALT || (process.env.NODE_ENV === 'production' ? null : "civictrack-salt");
+    if (!salt) {
+      const err = new Error("JWT salt is not configured.");
+      err.statusCode = 500;
+      throw err;
+    }
+    
     const secretKey = crypto.pbkdf2Sync(
       process.env.JWT_SECRET,
-      "civictrack-salt", // Same salt as used in encryption
+      salt,
       100000, // Same iterations as used in encryption
       32, // 32 bytes = 256 bits for AES-256
       "sha256"
