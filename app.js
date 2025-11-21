@@ -36,15 +36,36 @@ app.use(
 
 app.use(apiLimiter);
 
-const csrfProtection = csrf({ cookie: true });
+const csrfProtection = csrf({ 
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  }
+});
 
 app.get("/", (req, res) => {
   res.json({ message: "API is running..." });
 });
 
+app.get("/api/csrf-token", csrfProtection, (req, res) => {
+  res.json({ 
+    success: true,
+    csrfToken: req.csrfToken() 
+  });
+});
+
 app.use("/api/auth", authRoutes);
-app.use("/api/admin", csrfProtection, adminRoutes);
-app.use("/api/issues", csrfProtection, issueRoutes);
+
+const csrfMiddleware = (req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    return next();
+  }
+  return csrfProtection(req, res, next);
+};
+
+app.use("/api/admin", csrfMiddleware, adminRoutes);
+app.use("/api/issues", csrfMiddleware, issueRoutes);
 
 app.use(errorHandler);
 

@@ -5,10 +5,17 @@ module.exports = (err, req, res, next) => {
     console.error(err);
   }
 
-  const statusCode = err.statusCode || 500;
+  let statusCode = err.statusCode || 500;
+  let message = err.message;
+
+  if (err.code === 'EBADCSRFTOKEN') {
+    statusCode = 403;
+    message = 'Invalid CSRF token. Please refresh the page and try again.';
+  }
   
   const response = {
-    message: isDevelopment ? err.message : (err.statusCode ? err.message : 'An error occurred')
+    success: false,
+    message: isDevelopment ? message : (statusCode < 500 ? message : 'An error occurred')
   };
 
   if (isDevelopment && err.stack) {
