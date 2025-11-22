@@ -42,8 +42,7 @@ describe("Auth Module", () => {
     const getValidUserData = (emailSuffix = Date.now()) => ({
       name: "Test User",
       email: `testuser${emailSuffix}@example.com`,
-      password: "Test1234!",
-      confirmPassword: "Test1234!"
+      password: "Test1234!"
     });
 
     afterEach(async () => {
@@ -104,8 +103,7 @@ describe("Auth Module", () => {
         .post("/api/auth/register")
         .send({
           ...validUserData,
-          password: "Short1!",
-          confirmPassword: "Short1!"
+          password: "Short1!"
         });
 
       expect(res.status).toBe(422);
@@ -118,8 +116,7 @@ describe("Auth Module", () => {
         .post("/api/auth/register")
         .send({
           ...validUserData,
-          password: "test1234!",
-          confirmPassword: "test1234!"
+          password: "test1234!"
         });
 
       expect(res.status).toBe(422);
@@ -132,8 +129,7 @@ describe("Auth Module", () => {
         .post("/api/auth/register")
         .send({
           ...validUserData,
-          password: "TestPassword!",
-          confirmPassword: "TestPassword!"
+          password: "TestPassword!"
         });
 
       expect(res.status).toBe(422);
@@ -155,18 +151,9 @@ describe("Auth Module", () => {
       expect(res.body.message).toContain("already registered");
     });
 
-    it("should fail with mismatched passwords (negative)", async () => {
-      const validUserData = getValidUserData();
-      const res = await request(app)
-        .post("/api/auth/register")
-        .send({
-          ...validUserData,
-          confirmPassword: "Different123!"
-        });
-
-      expect(res.status).toBe(422);
-      expect(res.body.errors).toBeDefined();
-    });
+    // Note: confirmPassword validation removed from backend
+    // Password confirmation should be handled on frontend
+    // Test removed as backend no longer validates confirmPassword
   });
 
   describe("POST /api/auth/login", () => {
