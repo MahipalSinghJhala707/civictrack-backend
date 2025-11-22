@@ -145,14 +145,20 @@ module.exports = {
       imageUrls = []
     } = payload;
 
-    const issueCategory = await Issue.findByPk(issueId);
+    // Convert issueId to number (form data sends as string)
+    const issueIdNum = parseNumber(issueId);
+    if (!issueIdNum) {
+      throw httpError("A valid issue category is required.", 422);
+    }
+
+    const issueCategory = await Issue.findByPk(issueIdNum);
     if (!issueCategory) {
       throw toNotFoundError("Selected issue category does not exist.");
     }
 
     // Auto-assign authority based on strict matching: issue_id, region, and city
     // All three must match for assignment
-    const authorityRecord = await autoAssignAuthority(issueId, region, city);
+    const authorityRecord = await autoAssignAuthority(issueIdNum, region, city);
     // If auto-assignment fails, authorityRecord will be null (issue can still be created)
 
     const providedImageUrls = Array.isArray(imageUrls)
@@ -165,8 +171,20 @@ module.exports = {
       .filter(Boolean)
       .map((url) => String(url).trim());
 
-    const uploadedImageUrls =
-      files && files.length ? await uploadIssueImages(files) : [];
+    // Handle file uploads with error handling
+    let uploadedImageUrls = [];
+    try {
+      if (files && files.length) {
+        uploadedImageUrls = await uploadIssueImages(files);
+      }
+    } catch (s3Error) {
+      // Log S3 error but don't fail the entire request if S3 is optional
+      console.error("S3 upload error:", s3Error);
+      // Only throw if S3 is required and no other image URLs provided
+      if (!sanitizedProvidedUrls.length) {
+        throw httpError("Failed to upload images. Please try again.", 500);
+      }
+    }
 
     const allImageUrls = [...sanitizedProvidedUrls, ...uploadedImageUrls];
 
@@ -175,12 +193,12 @@ module.exports = {
         {
           title,
           description,
-          issue_id: issueId,
+          issue_id: issueIdNum,
           reporter_id: userId,
           authority_id: authorityRecord ? authorityRecord.id : null,
-          latitude: latitude ?? null,
-          longitude: longitude ?? null,
-          region: region ?? null
+          latitude: latitude ? parseNumber(latitude) : null,
+          longitude: longitude ? parseNumber(longitude) : null,
+          region: region ? String(region).trim() : null
           // Note: city is not stored in user_issue table, only used for authority matching
         },
         { transaction }

@@ -6,6 +6,7 @@ exports.createReportValidator = [
   body("title").trim().notEmpty().escape().withMessage("Title is required"),
   body("description").trim().notEmpty().escape().withMessage("Description is required"),
   body("issueId")
+    .toInt()
     .isInt({ min: 1 })
     .withMessage("A valid issue category is required"),
   body("region")
@@ -18,10 +19,12 @@ exports.createReportValidator = [
     .withMessage("City is required for authority assignment"),
   body("latitude")
     .optional({ values: "falsy" })
+    .toFloat()
     .isFloat({ min: -90, max: 90 })
     .withMessage("Latitude must be between -90 and 90"),
   body("longitude")
     .optional({ values: "falsy" })
+    .toFloat()
     .isFloat({ min: -180, max: 180 })
     .withMessage("Longitude must be between -180 and 180"),
   body("imageUrls")
