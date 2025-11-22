@@ -172,6 +172,7 @@ module.exports = {
       .map((url) => String(url).trim());
 
     // Handle file uploads with error handling
+    // Images are optional - if upload fails, report can still be created
     let uploadedImageUrls = [];
     if (files && files.length > 0) {
       try {
@@ -185,16 +186,15 @@ module.exports = {
           stack: s3Error.stack
         });
         
-        // If we have alternative image URLs, continue without uploaded images
-        if (sanitizedProvidedUrls.length > 0) {
-          console.warn("S3 upload failed but continuing with provided image URLs");
-          uploadedImageUrls = [];
-        } else {
-          // Only fail if S3 is the only image source
-          throw httpError(
-            s3Error.message || "Failed to upload images. Please check S3 configuration or try again later.", 
-            500
-          );
+        // Log warning but continue - images are optional
+        console.warn("S3 upload failed. Report will be created without uploaded images.");
+        uploadedImageUrls = [];
+        
+        // Check if we have any image URLs at all (provided or uploaded)
+        // If no images at all, we still allow the report to be created (images are optional)
+        // Only log a warning about missing images
+        if (sanitizedProvidedUrls.length === 0) {
+          console.warn("No images will be attached to this report (S3 upload failed and no provided URLs)");
         }
       }
     }

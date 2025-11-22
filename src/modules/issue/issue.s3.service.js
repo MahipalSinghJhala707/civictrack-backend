@@ -106,12 +106,13 @@ async function uploadIssueImages(files = []) {
     console.warn(`${failedUploads.length} image(s) failed to upload:`, 
       failedUploads.map(f => f.error));
     
-    // If all uploads failed, throw error
+    // If all uploads failed, log error but don't throw
+    // Images are optional, so we allow report creation to continue
     if (successfulUploads.length === 0) {
       const firstError = failedUploads[0];
-      const error = new Error(`Failed to upload images: ${firstError.error}`);
-      error.statusCode = 500;
-      throw error;
+      console.error("All image uploads failed:", firstError.error);
+      // Return empty array - report can still be created without images
+      return [];
     }
   }
   
