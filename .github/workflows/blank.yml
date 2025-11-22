@@ -1,9 +1,9 @@
-name: Deploy Backend to EC2
+name: Deploy Node.js Backend to EC2
 
 on:
   push:
     branches:
-      - working-project
+      - working-project   # change if needed
 
 jobs:
   deploy:
@@ -13,19 +13,90 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo SSH OK"
+      # Setup Node using the latest LTS version
+      - name: Set up Node.js (Latest LTS)
+        uses: actions/setup-node@v3
+        with:
+          node-version: "lts/*"
 
-      - name: Deploy to EC2
+      # Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # Run tests (optional)
+      - name: Run tests
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "
-            cd civictrack-backend &&
-            git pull origin working-project &&
-            npm install &&
-            pm2 restart civictrack-backend ||
-            pm2 start server.js --name civictrack-backend 
-          "
+          echo "No tests configured"
+          # npm test
+
+      # Create .env file locally
+      - name: Create .env file
+        run: |
+          echo "PORT=${{ secrets.PORT }}" >> .env
+
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+          echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
+
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "JWT_SALT=${{ secrets.JWT_SALT }}" >> .env
+          echo "JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}" >> .env
+
+          echo "FRONTEND_ORIGIN=${{ secrets.FRONTEND_ORIGIN }}" >> .env
+
+          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
+          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
+          echo "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}" >> .env
+          echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
+          echo "MAX_ISSUE_IMAGES=${{ secrets.MAX_ISSUE_IMAGES }}" >> .env
+          echo "AWS_S3_ACL=${{ secrets.AWS_S3_ACL }}" >> .env
+
+      # Copy project to EC2
+      - name: Copy project to EC2
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "."
+          target: "~/civictrack-backend"
+
+      # Restart app on EC2 using PM2
+      - name: Restart app on EC2
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/civictrack-backend
+
+            npm install
+
+            echo "PORT=${{ secrets.PORT }}" > .env
+
+            echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+            echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+            echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
+            echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
+            echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
+
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+            echo "JWT_SALT=${{ secrets.JWT_SALT }}" >> .env
+            echo "JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}" >> .env
+
+            echo "FRONTEND_ORIGIN=${{ secrets.FRONTEND_ORIGIN }}" >> .env
+
+            echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
+            echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
+            echo "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}" >> .env
+            echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
+            echo "MAX_ISSUE_IMAGES=${{ secrets.MAX_ISSUE_IMAGES }}" >> .env
+            echo "AWS_S3_ACL=${{ secrets.AWS_S3_ACL }}" >> .env
+
+            sudo npm install -g pm2
+
+            pm2 delete civictrack-backend || true
+            pm2 start server.js --name "civictrack-backend"
