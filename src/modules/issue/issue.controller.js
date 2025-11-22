@@ -29,10 +29,13 @@ module.exports = {
 
   async createReport(req, res, next) {
     try {
+      // Ensure files array is properly formatted
+      const files = Array.isArray(req.files) ? req.files : (req.files ? [req.files] : []);
+      
       const report = await IssueService.createReport(
         req.user.id,
         req.body,
-        req.files || []
+        files
       );
 
       return res.status(201).json({

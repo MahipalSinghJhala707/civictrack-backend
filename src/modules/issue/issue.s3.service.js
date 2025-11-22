@@ -37,30 +37,85 @@ const buildPublicUrl = (key) => {
   if (BASE_URL) {
     return `${BASE_URL.replace(/\/$/, "")}/${key}`;
   }
+  if (!BUCKET || !REGION) {
+    throw new Error("Cannot build public URL: S3 bucket or region not configured");
+  }
   return `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
 };
 
 async function uploadIssueImages(files = []) {
-  if (!files.length) return [];
+  if (!files || !files.length) return [];
 
-  ensureConfig();
+  // Check if S3 is configured
+  if (!REGION || !BUCKET) {
+    throw new Error("S3 storage is not configured. Please configure AWS_REGION and AWS_S3_BUCKET environment variables.");
+  }
 
-  const uploads = files.map(async (file) => {
-    const key = buildKey(file.originalname);
-
-    const command = new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: file.buffer,
-      ContentType: file.mimetype || "application/octet-stream",
-      ACL
-    });
-
-    await s3Client.send(command);
-    return buildPublicUrl(key);
+  // Validate that files have required properties
+  const validFiles = files.filter(file => {
+    if (!file || !file.buffer) {
+      console.warn("Skipping invalid file: missing buffer");
+      return false;
+    }
+    return true;
   });
 
-  return Promise.all(uploads);
+  if (!validFiles.length) {
+    return [];
+  }
+
+  const uploads = validFiles.map(async (file) => {
+    try {
+      const key = buildKey(file.originalname || "image");
+
+      const command = new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype || "application/octet-stream",
+        ACL
+      });
+
+      await s3Client.send(command);
+      return { success: true, url: buildPublicUrl(key) };
+    } catch (uploadError) {
+      console.error("Failed to upload single image:", {
+        error: uploadError.message,
+        code: uploadError.code,
+        name: uploadError.name
+      });
+      // Return error info instead of throwing so other uploads can continue
+      return { 
+        success: false, 
+        error: uploadError.message || "Unknown upload error",
+        originalError: uploadError
+      };
+    }
+  });
+
+  const results = await Promise.all(uploads);
+  
+  // Filter successful uploads
+  const successfulUploads = results
+    .filter(result => result.success)
+    .map(result => result.url);
+  
+  // Log failed uploads
+  const failedUploads = results.filter(result => !result.success);
+  if (failedUploads.length > 0) {
+    console.warn(`${failedUploads.length} image(s) failed to upload:`, 
+      failedUploads.map(f => f.error));
+    
+    // If all uploads failed, throw error
+    if (successfulUploads.length === 0) {
+      const firstError = failedUploads[0];
+      const error = new Error(`Failed to upload images: ${firstError.error}`);
+      error.statusCode = 500;
+      throw error;
+    }
+  }
+  
+  return successfulUploads;
 }
 
 module.exports = {

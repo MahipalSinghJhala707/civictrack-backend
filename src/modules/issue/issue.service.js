@@ -173,16 +173,29 @@ module.exports = {
 
     // Handle file uploads with error handling
     let uploadedImageUrls = [];
-    try {
-      if (files && files.length) {
+    if (files && files.length > 0) {
+      try {
         uploadedImageUrls = await uploadIssueImages(files);
-      }
-    } catch (s3Error) {
-      // Log S3 error but don't fail the entire request if S3 is optional
-      console.error("S3 upload error:", s3Error);
-      // Only throw if S3 is required and no other image URLs provided
-      if (!sanitizedProvidedUrls.length) {
-        throw httpError("Failed to upload images. Please try again.", 500);
+      } catch (s3Error) {
+        // Log S3 error details for debugging
+        console.error("S3 upload error:", {
+          message: s3Error.message,
+          code: s3Error.code,
+          name: s3Error.name,
+          stack: s3Error.stack
+        });
+        
+        // If we have alternative image URLs, continue without uploaded images
+        if (sanitizedProvidedUrls.length > 0) {
+          console.warn("S3 upload failed but continuing with provided image URLs");
+          uploadedImageUrls = [];
+        } else {
+          // Only fail if S3 is the only image source
+          throw httpError(
+            s3Error.message || "Failed to upload images. Please check S3 configuration or try again later.", 
+            500
+          );
+        }
       }
     }
 
