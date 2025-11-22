@@ -63,5 +63,18 @@ module.exports = {
     } catch (err) {
       next(err);
     }
+  },
+
+  async changePassword(req, res, next) {
+    try {
+      const user = await AuthService.changePassword(req.user.id, req.body);
+
+      return res.status(200).json({
+        success: true,
+        message: "Password changed successfully."
+      });
+    } catch (err) {
+      next(err);
+    }
   }
 };

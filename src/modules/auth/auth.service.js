@@ -110,5 +110,37 @@ module.exports = {
       if (!err.statusCode) err.statusCode = 500;
       throw err;
     }
+  },
+
+  async changePassword(userId, { oldPassword, newPassword }) {
+    try {
+      const user = await User.findByPk(userId);
+      if (!user) {
+        const err = new Error("User not found.");
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const match = await bcrypt.compare(oldPassword, user.password_hash);
+      if (!match) {
+        const err = new Error("Current password is incorrect.");
+        err.statusCode = 401;
+        throw err;
+      }
+
+      if (oldPassword === newPassword) {
+        const err = new Error("New password must be different from current password.");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await user.update({ password_hash: hashedPassword });
+
+      return user;
+    } catch (err) {
+      if (!err.statusCode) err.statusCode = 500;
+      throw err;
+    }
   }
 };

@@ -141,6 +141,20 @@ module.exports = {
     if (!deleted) {
       throw httpError("User not found.", 404);
     }
+  },
+
+  async changeUserPassword(userId, { newPassword }) {
+    const user = await User.findByPk(userId);
+    if (!user) {
+      throw httpError("User not found.", 404);
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await user.update({ password_hash: hashedPassword });
+
+    return User.findByPk(user.id, {
+      include: [roleInclude]
+    });
   }
 };
 

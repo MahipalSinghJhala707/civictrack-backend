@@ -7,7 +7,8 @@ const {
   createUserValidator,
   updateUserValidator,
   updateUserRolesValidator,
-  userIdParamValidator
+  userIdParamValidator,
+  changeUserPasswordValidator
 } = require("./user.validator.js");
 
 router.get("/", UserController.listUsers);
@@ -33,6 +34,14 @@ router.patch(
   updateUserRolesValidator,
   validate,
   UserController.updateUserRoles
+);
+
+router.patch(
+  "/:userId/password",
+  userIdParamValidator,
+  changeUserPasswordValidator,
+  validate,
+  UserController.changeUserPassword
 );
 
 router.delete(

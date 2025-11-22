@@ -48,3 +48,18 @@ exports.updateUserRolesValidator = [
     .withMessage("roleIds must contain numeric ids")
 ];
 
+exports.changeUserPasswordValidator = [
+  body("newPassword")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters")
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage("Password must contain at least one uppercase letter, one lowercase letter, and one number"),
+  body("confirmPassword")
+    .custom((value, { req }) => {
+      if (value !== req.body.newPassword) {
+        throw new Error("Password confirmation does not match new password");
+      }
+      return true;
+    })
+];
+
