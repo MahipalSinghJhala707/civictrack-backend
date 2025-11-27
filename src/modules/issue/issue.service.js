@@ -91,7 +91,9 @@ const baseReportInclude = [
   {
     model: IssueImage,
     as: "images",
-    attributes: ["id", "url"]
+    attributes: ["id", "url"],
+    required: false,
+    separate: false
   },
   {
     model: Log,

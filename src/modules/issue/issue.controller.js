@@ -38,10 +38,16 @@ module.exports = {
         files
       );
 
+      // Ensure images array is always present
+      const reportData = report.toJSON ? report.toJSON() : report;
+      if (!reportData.images || !Array.isArray(reportData.images)) {
+        reportData.images = [];
+      }
+
       return res.status(201).json({
         success: true,
         message: "Issue reported successfully.",
-        data: { report }
+        data: { report: reportData }
       });
     } catch (err) {
       next(err);
@@ -52,11 +58,21 @@ module.exports = {
     try {
       const reports = await IssueService.listReports(req.user, req.query);
 
+      // Ensure images array is always present for each report
+      const reportsWithImages = reports.map(report => {
+        const reportData = report.toJSON ? report.toJSON() : report;
+        // Ensure images is always an array
+        if (!reportData.images || !Array.isArray(reportData.images)) {
+          reportData.images = [];
+        }
+        return reportData;
+      });
+
       return res.status(200).json({
         success: true,
         data: { 
-          reports,
-          count: reports.length,
+          reports: reportsWithImages,
+          count: reportsWithImages.length,
           user: {
             id: req.user.id,
             role: req.user.role
@@ -73,9 +89,15 @@ module.exports = {
       const reportId = Number(req.params.reportId);
       const report = await IssueService.getReportById(reportId, req.user);
 
+      // Ensure images array is always present
+      const reportData = report.toJSON ? report.toJSON() : report;
+      if (!reportData.images || !Array.isArray(reportData.images)) {
+        reportData.images = [];
+      }
+
       return res.status(200).json({
         success: true,
-        data: { report }
+        data: { report: reportData }
       });
     } catch (err) {
       next(err);
