@@ -2,11 +2,11 @@ const app = require("./app");
 require("dotenv").config();
 const { sequelize } = require("./src/models");
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT;
 
 // Validate required environment variables
 function validateEnv() {
-  const required = ["JWT_SECRET", "DB_NAME", "DB_USER", "DB_PASS", "DB_HOST"];
+  const required = ["PORT", "JWT_SECRET", "DB_NAME", "DB_USER", "DB_PASS", "DB_HOST"];
   const missing = required.filter(key => !process.env[key] || process.env[key].trim() === "");
 
   if (missing.length > 0) {

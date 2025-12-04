@@ -18,15 +18,28 @@ app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
 const allowedOrigins = process.env.FRONTEND_ORIGIN?.split(',').map(origin => origin.trim()) || ['http://localhost:5173'];
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
 app.use(
   cors({
     origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) {
         return callback(null, true);
       }
+      
+      // In development, allow any localhost origin
+      if (isDevelopment && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:'))) {
+        return callback(null, true);
+      }
+      
+      // Check against allowed origins list
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
+      
+      // Log rejected origin for debugging
+      console.warn(`CORS: Origin "${origin}" not allowed. Allowed origins:`, allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true
