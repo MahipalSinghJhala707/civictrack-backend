@@ -10,7 +10,7 @@ const { securityHeaders, apiLimiter } = require("./src/shared/middleware/securit
 
 const app = express();
 
-app.set('trust proxy', true);
+app.set('trust proxy', trustProxy);
 
 app.use(securityHeaders);
 
