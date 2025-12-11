@@ -6,11 +6,9 @@ const authRoutes = require("./src/modules/auth/auth.route.js");
 const adminRoutes = require("./src/modules/admin/admin.route.js");
 const issueRoutes = require("./src/modules/issue/issue.route.js");
 const errorHandler = require("./src/shared/middleware/error.middleware.js");
-const { securityHeaders, apiLimiter } = require("./src/shared/middleware/security.middleware.js");
+const { securityHeaders } = require("./src/shared/middleware/security.middleware.js");
 
 const app = express();
-
-app.set('trust proxy', trustProxy);
 
 app.use(securityHeaders);
 
@@ -45,8 +43,6 @@ app.use(
     credentials: true
   })
 );
-
-app.use(apiLimiter);
 
 app.get("/", (req, res) => {
   res.json({ message: "API is running..." });
