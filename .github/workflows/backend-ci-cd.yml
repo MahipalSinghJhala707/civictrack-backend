@@ -79,11 +79,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Install AWS CLI v2
+      - name: Install/Update AWS CLI v2
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
           unzip -q /tmp/awscliv2.zip -d /tmp
-          sudo /tmp/aws/install -i /usr/local/aws-cli -b /usr/local/bin
+          sudo /tmp/aws/install --update -i /usr/local/aws-cli -b /usr/local/bin || sudo /tmp/aws/install -i /usr/local/aws-cli -b /usr/local/bin
+          aws --version
 
       - name: Update kubeconfig for EKS (aws cli)
         env:
