@@ -1,0 +1,136 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Optional full image tag to deploy (if empty uses commit SHA)'
+        required: false
+        default: ''
+
+env:
+  K8S_NAMESPACE: civictrack
+  DEPLOYMENT_NAME: civictrack-backend
+  CONTAINER_NAME: backend
+
+jobs:
+  build-scan-and-push:
+    name: Build, Scan & Push
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.set-image-tag.outputs.image_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: |
+          docker build -t backend:latest .
+
+      - name: Set image tag
+        id: set-image-tag
+        run: |
+          # allow manual override via workflow_dispatch input; otherwise use commit SHA
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            TAG="${{ github.event.inputs.image_tag }}"
+          else
+            TAG="${{ github.sha }}"
+          fi
+          echo "image_tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Tag image for ECR
+        run: |
+          IMAGE="${{ secrets.ECR_URI }}:${{ steps.set-image-tag.outputs.image_tag }}"
+          docker tag backend:latest "$IMAGE"
+
+      - name: Push image
+        run: |
+          IMAGE="${{ secrets.ECR_URI }}:${{ steps.set-image-tag.outputs.image_tag }}"
+          docker push "$IMAGE"
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.ECR_URI }}:${{ steps.set-image-tag.outputs.image_tag }}
+          exit-code: '0'
+          format: table
+
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: build-scan-and-push
+    steps:
+      - name: Checkout (for optional manifests)
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials for deploy
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Update kubeconfig for EKS
+        uses: aws-actions/eks-update-kubeconfig@v2
+        with:
+          cluster-name: ${{ secrets.EKS_CLUSTER_NAME }}
+          region: ${{ secrets.AWS_REGION }}
+
+      - name: Set image on Deployment (rolling update)
+        env:
+          IMAGE_URI: ${{ secrets.ECR_URI }}:${{ needs.build-scan-and-push.outputs.image_tag }}
+        run: |
+          echo "Deploying image: $IMAGE_URI"
+          kubectl -n ${K8S_NAMESPACE} set image deployment/${DEPLOYMENT_NAME} ${CONTAINER_NAME}=$IMAGE_URI
+
+      - name: Wait for rollout to finish
+        run: |
+          kubectl -n ${K8S_NAMESPACE} rollout status deployment/${DEPLOYMENT_NAME} --timeout=180s
+
+      - name: (Optional) Run migrations inside cluster
+        env:
+          IMAGE_URI: ${{ secrets.ECR_URI }}:${{ needs.build-scan-and-push.outputs.image_tag }}
+          RUN_MIGRATIONS: ${{ secrets.RUN_DB_MIGRATIONS }}
+          JOB_NAME: civictrack-migrate-${{ github.run_id }}
+        if: env.RUN_MIGRATIONS == 'true'
+        run: |
+          cat > /tmp/migrate-job.yaml <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: $JOB_NAME
+            namespace: ${K8S_NAMESPACE}
+          spec:
+            backoffLimit: 1
+            template:
+              spec:
+                containers:
+                - name: migrate
+                  image: $IMAGE_URI
+                  command: ["npm","run","migrate"]
+                  envFrom:
+                  - secretRef:
+                      name: civictrack-db-secret
+                restartPolicy: Never
+            ttlSecondsAfterFinished: 300
+          EOF
+          kubectl apply -f /tmp/migrate-job.yaml
+          kubectl -n ${K8S_NAMESPACE} wait --for=condition=complete job/$JOB_NAME --timeout=300s || (kubectl -n ${K8S_NAMESPACE} logs job/$JOB_NAME && exit 1)
+
+      - name: Show current pods & rollout status
+        run: |
+          kubectl -n ${K8S_NAMESPACE} get pods -o wide
+          kubectl -n ${K8S_NAMESPACE} get deployment ${DEPLOYMENT_NAME} -o wide
