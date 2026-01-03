@@ -15,7 +15,8 @@
 11. [CI/CD Pipeline](#cicd-pipeline)
 12. [Deployment](#deployment)
 13. [Testing](#testing)
-14. [Troubleshooting](#troubleshooting)
+14. [File Structure & File Descriptions](#file-structure--file-descriptions)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -813,6 +814,213 @@ describe('Authentication', () => {
   });
 });
 ```
+
+---
+
+## File Structure & File Descriptions
+
+This section provides a comprehensive overview of every file in the project and its purpose.
+
+### Root Directory Files
+
+| File | Purpose |
+|------|---------|
+| `package.json` | Node.js project configuration, dependencies, and npm scripts |
+| `package-lock.json` | Locked dependency versions (auto-generated) |
+| `server.js` | Application entry point - starts the Express server, validates environment, connects to database |
+| `app.js` | Express application configuration - middleware setup, route registration, CORS configuration |
+| `Dockerfile` | Docker image build instructions for containerization |
+| `.dockerignore` | Files/directories to exclude from Docker builds |
+| `.gitignore` | Files/directories to exclude from Git version control |
+| `README.md` | This documentation file |
+| `.env.sample` | Template for environment variables (copy to `.env`) |
+
+### Source Directory (`src/`)
+
+#### Configuration (`src/config/`)
+
+| File | Purpose |
+|------|---------|
+| `db.config.js` | Sequelize database configuration - connection settings, SSL configuration for RDS |
+
+#### Models (`src/models/`)
+
+| File | Purpose |
+|------|---------|
+| `index.js` | Model loader - automatically loads all models and sets up associations |
+| `user.model.js` | User model - stores citizen, authority, and admin user data |
+| `role.model.js` | Role model - defines user roles (citizen, authority, admin) |
+| `userRole.model.js` | User-Role junction table - many-to-many relationship between users and roles |
+| `department.model.js` | Department model - government departments |
+| `authority.model.js` | Authority model - authority organizations |
+| `authorityUser.model.js` | Authority-User relationship - links users to authorities |
+| `issue.model.js` | Issue/Report model - citizen-reported issues |
+| `userIssue.model.js` | User-Issue relationship - links issues to users (reporters) |
+| `issueImage.model.js` | Issue Image model - stores image metadata for issue reports |
+| `authorityIssue.model.js` | Authority-Issue relationship - assigns issues to authorities |
+| `flag.model.js` | Flag model - defines flag types (inappropriate, spam, etc.) |
+| `userIssueFlag.model.js` | User-Issue-Flag relationship - tracks flagged issues |
+| `log.model.js` | Log model - system activity logs |
+
+#### Migrations (`src/migrations/`)
+
+| File | Purpose |
+|------|---------|
+| `run-migrations.js` | Migration runner - executes all migration files in order |
+| `README.md` | Migration documentation and guidelines |
+| `001-add-rejected-status.js` | Adds 'rejected' status to user_issue.status enum |
+| `20240101000001-create-roles.js` | Creates roles table |
+| `20240101000002-create-users.js` | Creates users table |
+| `20240101000003-create-departments.js` | Creates departments table |
+| `20240101000004-create-authorities.js` | Creates authorities table |
+| `20240101000005-create-issues.js` | Creates issues table |
+| `20240101000006-create-flags.js` | Creates flags table |
+| `20240101000007-create-user-role.js` | Creates user_role junction table |
+| `20240101000008-create-authority-issue.js` | Creates authority_issue relationship table |
+| `20240101000009-create-user-issue.js` | Creates user_issue relationship table |
+| `20240101000010-create-issue-images.js` | Creates issue_images table |
+| `20240101000011-create-logs.js` | Creates logs table |
+| `20240101000012-create-authority-user.js` | Creates authority_user relationship table |
+| `20240101000013-create-user-issue-flag.js` | Creates user_issue_flag relationship table |
+
+#### Authentication Module (`src/modules/auth/`)
+
+| File | Purpose |
+|------|---------|
+| `auth.route.js` | Authentication routes - register, login, logout, me, change-password |
+| `auth.controller.js` | Authentication controller - handles auth request logic |
+| `auth.service.js` | Authentication service - business logic for authentication |
+| `auth.middleware.js` | Authentication middleware - verifies JWT tokens |
+| `auth.roles.js` | Role-based access control - middleware for role checking |
+| `auth.validator.js` | Authentication validators - input validation rules for auth endpoints |
+
+#### Issue Module (`src/modules/issue/`)
+
+| File | Purpose |
+|------|---------|
+| `issue.route.js` | Issue routes - create, list, get, update status, flag, toggle visibility |
+| `issue.controller.js` | Issue controller - handles issue request logic |
+| `issue.service.js` | Issue service - business logic for issue management |
+| `issue.s3.service.js` | S3 service - handles image uploads to AWS S3 |
+| `issue.middleware.js` | Issue middleware - file upload handling with Multer |
+| `issue.validator.js` | Issue validators - input validation rules for issue endpoints |
+
+#### Admin Module (`src/modules/admin/`)
+
+**Admin Route** (`admin.route.js`):
+- Main admin router - applies authentication and admin role check to all admin routes
+
+**User Management** (`user/`):
+| File | Purpose |
+|------|---------|
+| `user.route.js` | User CRUD routes |
+| `user.controller.js` | User controller logic |
+| `user.service.js` | User business logic |
+| `user.validator.js` | User input validation |
+
+**Department Management** (`department/`):
+| File | Purpose |
+|------|---------|
+| `department.route.js` | Department CRUD routes |
+| `department.controller.js` | Department controller logic |
+| `department.service.js` | Department business logic |
+| `department.validator.js` | Department input validation |
+
+**Authority Management** (`authority/`):
+| File | Purpose |
+|------|---------|
+| `authority.route.js` | Authority CRUD routes |
+| `authority.controller.js` | Authority controller logic |
+| `authority.service.js` | Authority business logic |
+| `authority.validator.js` | Authority input validation |
+
+**Authority User Management** (`authorityUser/`):
+| File | Purpose |
+|------|---------|
+| `authorityUser.route.js` | Authority-user relationship routes |
+| `authorityUser.controller.js` | Authority-user controller logic |
+| `authorityUser.service.js` | Authority-user business logic |
+| `authorityUser.validator.js` | Authority-user input validation |
+
+**Issue Category Management** (`issueCategory/`):
+| File | Purpose |
+|------|---------|
+| `issueCategory.route.js` | Issue category CRUD routes |
+| `issueCategory.controller.js` | Issue category controller logic |
+| `issueCategory.service.js` | Issue category business logic |
+| `issueCategory.validator.js` | Issue category input validation |
+
+#### Seeders (`src/seeders/`)
+
+| File | Purpose |
+|------|---------|
+| `seed-all.js` | Main seeder - seeds all tables with sample data |
+| `reset-db.js` | Database reset utility - drops all tables |
+| `fix-sequences.js` | Sequence fixer - resets PostgreSQL auto-increment sequences |
+| `utils/sequence-fixer.js` | Sequence fixer utility - helper functions for sequence management |
+
+#### Shared Utilities (`src/shared/`)
+
+**Middleware** (`shared/middleware/`):
+| File | Purpose |
+|------|---------|
+| `error.middleware.js` | Global error handler - catches and formats all errors |
+| `security.middleware.js` | Security headers - Helmet.js configuration |
+| `validate.js` | Validation middleware - processes express-validator results |
+
+**Utils** (`shared/utils/`):
+| File | Purpose |
+|------|---------|
+| `httpError.js` | HTTP error utility - creates standardized error objects |
+
+### Tests (`tests/`)
+
+| File | Purpose |
+|------|---------|
+| `app.test.js` | Application-level tests - tests basic app functionality |
+| `auth.test.js` | Authentication tests - tests login, register, etc. |
+
+### CI/CD (`.github/workflows/`)
+
+| File | Purpose |
+|------|---------|
+| `backend-ci-cd.yml` | GitHub Actions workflow - automated build, scan, and deployment to AWS EKS |
+
+### Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `.dockerignore` | Excludes files from Docker builds (node_modules, .env, logs, etc.) |
+| `.gitignore` | Excludes files from Git (node_modules, .env, logs, OS files, etc.) |
+
+### File Naming Conventions
+
+- **Models**: `*.model.js` - Sequelize ORM models
+- **Routes**: `*.route.js` - Express route definitions
+- **Controllers**: `*.controller.js` - Request handlers
+- **Services**: `*.service.js` - Business logic layer
+- **Validators**: `*.validator.js` - Input validation rules
+- **Middleware**: `*.middleware.js` - Express middleware functions
+- **Migrations**: `YYYYMMDDHHMMSS-description.js` or `NNN-description.js` - Database migrations
+- **Tests**: `*.test.js` - Jest test files
+
+### Module Pattern
+
+Each feature module follows a consistent structure:
+
+```
+module-name/
+├── module-name.route.js      # Routes
+├── module-name.controller.js  # Controllers
+├── module-name.service.js     # Services
+└── module-name.validator.js  # Validators
+```
+
+This pattern ensures:
+- **Separation of Concerns**: Each layer has a specific responsibility
+- **Maintainability**: Easy to locate and modify code
+- **Testability**: Each layer can be tested independently
+- **Scalability**: Easy to add new features following the same pattern
 
 ---
 
