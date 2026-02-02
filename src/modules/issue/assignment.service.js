@@ -6,6 +6,12 @@
  * Dedicated service for deterministic authority assignment with explicit outcomes.
  * All assignment logic is centralized here - controllers must NOT contain assignment logic.
  * 
+ * SOFT-DELETE INVARIANTS:
+ * - Soft-deleted authorities MUST NOT be considered for assignment
+ * - Assignment queries use paranoid: true (default) to exclude deleted records
+ * - UNASSIGNED_AUTHORITY_INACTIVE is returned when ALL matching authorities are inactive
+ * - Admin reassignment explicitly validates target authority is active
+ * 
  * Every assignment attempt results in ONE explicit outcome:
  * - ASSIGNED
  * - UNASSIGNED_NO_MATCHING_AUTHORITY
@@ -24,6 +30,11 @@ const {
   sequelize
 } = require('../../models');
 const httpError = require('../../shared/utils/httpError.js');
+const {
+  assertNotDeleted,
+  isActive,
+  withDeletedRecords
+} = require('../../shared/utils/softDelete.js');
 
 /**
  * Assignment outcome constants
@@ -96,14 +107,19 @@ async function createAssignmentLog(params, transaction) {
 /**
  * Find matching authority based on assignment criteria
  * 
+ * SOFT-DELETE BEHAVIOR:
+ * - All Authority queries use paranoid: true (default) - excludes soft-deleted
+ * - If no active authority found, we check if ANY authority (including deleted) exists
+ *   to differentiate between "no config" vs "all inactive"
+ * 
  * @param {Object} criteria - Assignment criteria
  * @param {number} criteria.issueCategoryId - Issue category ID
  * @param {number} criteria.cityId - City ID
  * @param {string} [criteria.region] - Optional region/zone
- * @returns {Promise<{authority: Authority|null, reason: string}>}
+ * @returns {Promise<{authority: Authority|null, reason: string, outcome: string}>}
  */
 async function findMatchingAuthority({ issueCategoryId, cityId, region }) {
-  // Step 1: Find authorities mapped to this issue category
+  // Step 1: Find authority-issue mappings (active only due to paranoid: true)
   const authorityIssues = await AuthorityIssue.findAll({
     where: { issue_id: issueCategoryId }
   });
@@ -111,71 +127,83 @@ async function findMatchingAuthority({ issueCategoryId, cityId, region }) {
   if (authorityIssues.length === 0) {
     return {
       authority: null,
-      reason: `No authorities are configured to handle issue category ID ${issueCategoryId}`
+      reason: `No authorities are configured to handle issue category ID ${issueCategoryId}`,
+      outcome: ASSIGNMENT_OUTCOMES.UNASSIGNED_NO_MATCHING_AUTHORITY
     };
   }
 
   const authorityIds = authorityIssues.map(ai => ai.authority_id);
 
-  // Step 2: Build where clause for authority matching
+  // Step 2: Build where clause for ACTIVE authority matching
+  // paranoid: true is default - only returns non-deleted authorities
   const whereClause = {
     id: { [Op.in]: authorityIds },
     city_id: cityId
   };
 
-  // Step 3: If region is provided, try to match it first
+  // Step 3: If region is provided, try to match it first (active authorities only)
   if (region && region.trim()) {
     const authorityWithRegion = await Authority.findOne({
       where: {
         ...whereClause,
         region: { [Op.iLike]: region.trim() }
       }
+      // paranoid: true is default - excludes soft-deleted
     });
 
     if (authorityWithRegion) {
-      // Check if authority is soft-deleted (inactive)
-      if (authorityWithRegion.deleted_at) {
-        return {
-          authority: null,
-          reason: `Authority "${authorityWithRegion.name}" (ID: ${authorityWithRegion.id}) is inactive`
-        };
-      }
-
       return {
         authority: authorityWithRegion,
-        reason: `Matched authority "${authorityWithRegion.name}" for city ID ${cityId}, region "${region}", issue category ${issueCategoryId}`
+        reason: `Matched authority "${authorityWithRegion.name}" for city ID ${cityId}, region "${region}", issue category ${issueCategoryId}`,
+        outcome: ASSIGNMENT_OUTCOMES.ASSIGNED
       };
     }
   }
 
-  // Step 4: Fall back to city-only match (any authority in the city handling this issue type)
+  // Step 4: Fall back to city-only match (any ACTIVE authority in the city)
   const authorityInCity = await Authority.findOne({
     where: whereClause,
-    order: [['createdAt', 'ASC']] // Deterministic: pick the oldest authority
+    order: [['createdAt', 'ASC']] // Deterministic: pick the oldest active authority
+    // paranoid: true is default - excludes soft-deleted
   });
 
-  if (!authorityInCity) {
+  if (authorityInCity) {
+    const matchReason = region
+      ? `No authority matched region "${region}", assigned to "${authorityInCity.name}" (city fallback)`
+      : `Matched authority "${authorityInCity.name}" for city ID ${cityId}, issue category ${issueCategoryId}`;
+
     return {
-      authority: null,
-      reason: `No authority in city ID ${cityId} is configured to handle issue category ID ${issueCategoryId}`
+      authority: authorityInCity,
+      reason: matchReason,
+      outcome: ASSIGNMENT_OUTCOMES.ASSIGNED
     };
   }
 
-  // Check if authority is soft-deleted (inactive)
-  if (authorityInCity.deleted_at) {
+  // Step 5: No active authority found - determine if it's "no config" or "all inactive"
+  // Check if there ARE authorities that match but are soft-deleted
+  const deletedAuthorityCount = await Authority.count(
+    withDeletedRecords({
+      where: {
+        ...whereClause,
+        deleted_at: { [Op.ne]: null } // Only count soft-deleted ones
+      }
+    })
+  );
+
+  if (deletedAuthorityCount > 0) {
+    // There are matching authorities but they're all inactive
     return {
       authority: null,
-      reason: `Authority "${authorityInCity.name}" (ID: ${authorityInCity.id}) is inactive`
+      reason: `All authorities for city ID ${cityId} handling issue category ID ${issueCategoryId} are inactive (soft-deleted)`,
+      outcome: ASSIGNMENT_OUTCOMES.UNASSIGNED_AUTHORITY_INACTIVE
     };
   }
 
-  const matchReason = region
-    ? `No authority matched region "${region}", assigned to "${authorityInCity.name}" (city fallback)`
-    : `Matched authority "${authorityInCity.name}" for city ID ${cityId}, issue category ${issueCategoryId}`;
-
+  // No authorities at all (active or deleted) for this city/issue combination
   return {
-    authority: authorityInCity,
-    reason: matchReason
+    authority: null,
+    reason: `No authority in city ID ${cityId} is configured to handle issue category ID ${issueCategoryId}`,
+    outcome: ASSIGNMENT_OUTCOMES.UNASSIGNED_NO_MATCHING_AUTHORITY
   };
 }
 
@@ -254,20 +282,16 @@ async function assignAuthority(params) {
       });
     }
 
-    // Auto-assignment logic
-    const { authority, reason } = await findMatchingAuthority({
+    // Auto-assignment logic (uses paranoid: true, excludes soft-deleted authorities)
+    const { authority, reason, outcome: matchOutcome } = await findMatchingAuthority({
       issueCategoryId,
       cityId,
       region
     });
 
     if (!authority) {
-      // Determine specific unassigned outcome
-      const outcome = reason.includes('inactive')
-        ? ASSIGNMENT_OUTCOMES.UNASSIGNED_AUTHORITY_INACTIVE
-        : reason.includes('configured')
-          ? ASSIGNMENT_OUTCOMES.UNASSIGNED_NO_MATCHING_AUTHORITY
-          : ASSIGNMENT_OUTCOMES.UNASSIGNED_CONFIGURATION_ERROR;
+      // Use the outcome determined by findMatchingAuthority
+      const outcome = matchOutcome;
 
       // Update report to have no authority
       await report.update({ authority_id: null }, { transaction });
@@ -357,10 +381,24 @@ async function handleAdminReassignment({
     };
   }
 
-  // Validate target authority exists and belongs to same city
+  // Validate target authority exists and is ACTIVE
+  // findByPk with paranoid: true (default) returns null if soft-deleted
   const targetAuthority = await Authority.findByPk(targetAuthorityId, { transaction });
   
   if (!targetAuthority) {
+    // Could be non-existent OR soft-deleted - check which
+    const deletedAuthority = await Authority.findByPk(
+      targetAuthorityId,
+      withDeletedRecords({ transaction })
+    );
+
+    if (deletedAuthority && !isActive(deletedAuthority)) {
+      throw httpError(
+        `Authority "${deletedAuthority.name}" is inactive and cannot be assigned`,
+        400
+      );
+    }
+    
     throw httpError(`Authority ID ${targetAuthorityId} not found`, 404);
   }
 
@@ -371,12 +409,7 @@ async function handleAdminReassignment({
     );
   }
 
-  if (targetAuthority.deleted_at) {
-    throw httpError(
-      `Authority "${targetAuthority.name}" is inactive and cannot be assigned`,
-      400
-    );
-  }
+  // No need to check deleted_at - paranoid: true already excludes soft-deleted
 
   // Perform reassignment
   await report.update({ authority_id: targetAuthorityId }, { transaction });

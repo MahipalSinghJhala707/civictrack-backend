@@ -4,38 +4,55 @@ const {
   User
 } = require("../../../models");
 const httpError = require("../../../shared/utils/httpError.js");
-const { validateCityScope } = require("../../../shared/utils/cityScope.js");
+const { validateCityScope, buildParanoidOptions } = require("../../../shared/utils/cityScope.js");
 const {
   buildQueryOptions,
   buildPaginatedResponse
 } = require("../../../shared/utils/pagination.js");
+const { assertNotDeleted } = require("../../../shared/utils/softDelete.js");
 
+/**
+ * Include definitions for authority-user queries
+ * 
+ * SOFT-DELETE BEHAVIOR:
+ * - paranoid: true (default) ensures soft-deleted authorities/users are excluded from joins
+ * - required: false allows AuthorityUser records to be returned even if related entity is deleted
+ *   (the related entity will be null in the response)
+ */
 const authorityUserIncludes = [
   {
     model: Authority,
     as: "authority",
-    attributes: ["id", "name", "city", "region"]
+    attributes: ["id", "name", "city", "region"],
+    required: false // Allow null if authority was soft-deleted
+    // paranoid: true is default - excludes soft-deleted authorities
   },
   {
     model: User,
     as: "user",
-    attributes: ["id", "name", "email"]
+    attributes: ["id", "name", "email"],
+    required: false // Allow null if user was soft-deleted
+    // paranoid: true is default - excludes soft-deleted users
   }
 ];
 
+/**
+ * Validate that an authority exists and is active
+ */
 const ensureAuthorityExists = async (authorityId) => {
   const authority = await Authority.findByPk(authorityId);
-  if (!authority) {
-    throw httpError("Authority not found.", 404);
-  }
+  // findByPk with paranoid: true (default) returns null if soft-deleted
+  assertNotDeleted(authority, 'Authority');
   return authority;
 };
 
+/**
+ * Validate that a user exists and is active
+ */
 const ensureUserExists = async (userId) => {
   const user = await User.findByPk(userId);
-  if (!user) {
-    throw httpError("User not found.", 404);
-  }
+  // findByPk with paranoid: true (default) returns null if soft-deleted
+  assertNotDeleted(user, 'User');
   return user;
 };
 
@@ -43,7 +60,13 @@ module.exports = {
   /**
    * List authority-user mappings with city scoping and mandatory pagination
    * Filter based on the authority's city_id
-   * @param {Object} adminContext - { adminCityId, includeAllCities }
+   * 
+   * SOFT-DELETE BEHAVIOR:
+   * - By default, excludes soft-deleted authority-user mappings (paranoid: true)
+   * - If adminContext.includeDeleted is true, includes soft-deleted mappings
+   *   (for admin audit/diagnostic purposes only)
+   * 
+   * @param {Object} adminContext - { adminCityId, includeAllCities, includeDeleted }
    * @param {Object} pagination - { page, limit, offset, sortBy, sortOrder, entityType }
    * @returns {Promise<{data: Array, meta: Object}>}
    */
@@ -51,6 +74,7 @@ module.exports = {
     validateCityScope(adminContext);
     
     const { adminCityId, includeAllCities } = adminContext;
+    const paranoidOptions = buildParanoidOptions(adminContext);
     
     // Build authority include with optional city filter
     const authorityIncludeWithFilter = {
@@ -76,6 +100,7 @@ module.exports = {
         }
       ],
       ...paginationOptions,
+      ...paranoidOptions, // Apply paranoid options from admin context
       distinct: true
     });
 

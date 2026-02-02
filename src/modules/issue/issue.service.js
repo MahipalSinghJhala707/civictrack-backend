@@ -14,7 +14,7 @@ const {
 } = require("../../models");
 const { uploadIssueImages } = require("./issue.s3.service.js");
 const httpError = require("../../shared/utils/httpError.js");
-const { validateCityScope, applyCityFilter } = require("../../shared/utils/cityScope.js");
+const { validateCityScope, applyCityFilter, buildParanoidOptions } = require("../../shared/utils/cityScope.js");
 const {
   buildQueryOptions,
   buildPaginatedResponse
@@ -34,27 +34,42 @@ const parseNumber = (value) => {
   return Number.isNaN(parsed) ? null : parsed;
 };
 
+/**
+ * Base includes for report queries
+ * 
+ * SOFT-DELETE BEHAVIOR:
+ * - All models use paranoid: true - soft-deleted records are excluded by default
+ * - required: false on optional relations allows null if related entity was soft-deleted
+ * - This ensures reports with deleted authorities/reporters still appear (with null relations)
+ */
 const baseReportInclude = [
   {
     model: Issue,
     as: "issue",
-    attributes: ["id", "name", "slug"]
+    attributes: ["id", "name", "slug"],
+    required: false // Allow null if issue category was soft-deleted
+    // paranoid: true is default
   },
   {
     model: Authority,
     as: "authority",
-    attributes: ["id", "name", "city", "region", "city_id"]
+    attributes: ["id", "name", "city", "region", "city_id"],
+    required: false // Allow null if authority was soft-deleted or unassigned
+    // paranoid: true is default - soft-deleted authorities return null
   },
   {
     model: User,
     as: "reporter",
-    attributes: ["id", "name", "email"]
+    attributes: ["id", "name", "email"],
+    required: false // Allow null if reporter was soft-deleted
+    // paranoid: true is default
   },
   {
     model: City,
     as: "city",
     attributes: ["id", "name", "state"],
     required: false
+    // paranoid: true is default
   },
   {
     model: IssueImage,
@@ -62,23 +77,37 @@ const baseReportInclude = [
     attributes: ["id", "url"],
     required: false,
     separate: false
+    // paranoid: true is default - soft-deleted images excluded
   },
   {
     model: Log,
     as: "logs",
-    attributes: ["id", "from_status", "to_status", "comment", "updated_by", "createdAt"]
+    attributes: ["id", "from_status", "to_status", "comment", "updated_by", "createdAt"],
+    required: false
+    // paranoid: true is default
   }
 ];
 
+/**
+ * Flag include for report queries
+ * 
+ * SOFT-DELETE BEHAVIOR:
+ * - Soft-deleted flags are excluded from the response
+ * - Soft-deleted user-issue-flag records are excluded
+ */
 const flagInclude = {
   model: UserIssueFlag,
   as: "flags",
   attributes: ["id", "flag_id", "user_id", "createdAt"],
+  required: false, // Reports without flags still returned
+  // paranoid: true is default - soft-deleted flag records excluded
   include: [
     {
       model: Flag,
       as: "flag",
-      attributes: ["id", "name"]
+      attributes: ["id", "name"],
+      required: false // Allow null if flag type was soft-deleted
+      // paranoid: true is default
     }
   ]
 };
@@ -261,9 +290,15 @@ module.exports = {
 
   /**
    * List reports with mandatory pagination and ordering
+   * 
+   * SOFT-DELETE BEHAVIOR:
+   * - By default, excludes soft-deleted reports (paranoid: true)
+   * - If adminContext.includeDeleted is true, includes soft-deleted reports
+   *   (for admin audit/diagnostic purposes only)
+   * 
    * @param {Object} user - Current user
    * @param {Object} filters - Query filters (status, issueId, region, myIssues)
-   * @param {Object} adminContext - { adminCityId, includeAllCities }
+   * @param {Object} adminContext - { adminCityId, includeAllCities, includeDeleted }
    * @param {Object} pagination - { page, limit, offset, sortBy, sortOrder, entityType }
    * @returns {Promise<{data: Array, meta: Object}>}
    */
@@ -285,6 +320,9 @@ module.exports = {
         [Op.iLike]: `${filters.region}%`
       };
     }
+
+    // Default paranoid options (only admins can override)
+    let paranoidOptions = {};
 
     if (user.role === "citizen") {
       // Citizens can see all public issues (not hidden)
@@ -310,6 +348,8 @@ module.exports = {
         validateCityScope(adminContext);
         const cityFilter = applyCityFilter({}, adminContext, 'city_id');
         Object.assign(whereClause, cityFilter);
+        // Admin can request to see deleted records
+        paranoidOptions = buildParanoidOptions(adminContext);
       }
     } else {
       throw toForbiddenError("Unsupported role for listing issues.");
@@ -325,6 +365,7 @@ module.exports = {
       where: whereClause,
       include: [...baseReportInclude, flagInclude],
       ...paginationOptions,
+      ...paranoidOptions, // Apply paranoid options (only for admin with includeDeleted)
       distinct: true
     });
 
@@ -453,7 +494,13 @@ module.exports = {
 
   /**
    * List flagged reports with city scoping and mandatory pagination
-   * @param {Object} adminContext - { adminCityId, includeAllCities }
+   * 
+   * SOFT-DELETE BEHAVIOR:
+   * - By default, excludes soft-deleted reports (paranoid: true)
+   * - If adminContext.includeDeleted is true, includes soft-deleted reports
+   *   (for admin audit/diagnostic purposes only)
+   * 
+   * @param {Object} adminContext - { adminCityId, includeAllCities, includeDeleted }
    * @param {Object} pagination - { page, limit, offset, sortBy, sortOrder, entityType }
    * @returns {Promise<{data: Array, meta: Object}>}
    */
@@ -461,6 +508,7 @@ module.exports = {
     validateCityScope(adminContext);
     
     const whereClause = applyCityFilter({}, adminContext, 'city_id');
+    const paranoidOptions = buildParanoidOptions(adminContext);
     
     // Build pagination options (defaults applied if not provided)
     const paginationOptions = buildQueryOptions({
@@ -478,6 +526,7 @@ module.exports = {
         }
       ],
       ...paginationOptions,
+      ...paranoidOptions, // Apply paranoid options from admin context
       distinct: true
     });
 

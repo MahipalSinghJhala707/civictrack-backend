@@ -6,6 +6,9 @@
  * Provides helper functions for applying city-based filtering
  * to admin queries. All admin list endpoints should be city-scoped
  * by default unless explicitly requesting cross-city data.
+ * 
+ * Also handles admin override for viewing soft-deleted records
+ * (audit/diagnostic purposes only).
  */
 
 const httpError = require('./httpError.js');
@@ -14,7 +17,7 @@ const httpError = require('./httpError.js');
  * Extract admin context from request
  * 
  * @param {Object} req - Express request object
- * @returns {Object} Admin context with cityId and includeAllCities flag
+ * @returns {Object} Admin context with cityId, includeAllCities, and includeDeleted flags
  */
 function extractAdminContext(req) {
   // cityId can come from:
@@ -32,12 +35,21 @@ function extractAdminContext(req) {
     req.query.includeAllCities === true ||
     req.body?.includeAllCities === true;
 
+  // Explicit flag to include soft-deleted records (admin audit only)
+  // DANGER: This bypasses soft-delete protection
+  // Should only be used for audit trails and diagnostic purposes
+  const includeDeleted = 
+    req.query.includeDeleted === 'true' || 
+    req.query.includeDeleted === true ||
+    req.body?.includeDeleted === true;
+
   // Priority: query param > body > user's city
   const adminCityId = cityIdFromQuery || cityIdFromBody || cityIdFromUser;
 
   return {
     adminCityId,
-    includeAllCities
+    includeAllCities,
+    includeDeleted
   };
 }
 
@@ -119,10 +131,49 @@ function withCityScope(options = {}, context, fieldName = 'city_id') {
   };
 }
 
+/**
+ * Build paranoid option based on admin context
+ * 
+ * IMPORTANT: Only returns { paranoid: false } if includeDeleted is explicitly true
+ * This is a DANGEROUS operation and should only be used for admin audit/diagnostic
+ * 
+ * @param {Object} context - Admin context with includeDeleted flag
+ * @returns {Object} Paranoid options { paranoid: true|false }
+ */
+function buildParanoidOptions(context) {
+  // Default is paranoid: true (exclude soft-deleted)
+  // Only disable paranoid if explicitly requested
+  if (context && context.includeDeleted === true) {
+    return { paranoid: false };
+  }
+  return { paranoid: true };
+}
+
+/**
+ * Apply paranoid and city scope to query options
+ * Convenience function for admin queries that need both
+ * 
+ * @param {Object} options - Base query options
+ * @param {Object} context - Admin context
+ * @param {string} fieldName - The field name for city filter
+ * @returns {Object} Query options with city scope and paranoid options applied
+ */
+function withAdminScope(options = {}, context, fieldName = 'city_id') {
+  const scopedOptions = withCityScope(options, context, fieldName);
+  const paranoidOptions = buildParanoidOptions(context);
+  
+  return {
+    ...scopedOptions,
+    ...paranoidOptions
+  };
+}
+
 module.exports = {
   extractAdminContext,
   validateCityScope,
   buildCityFilter,
   applyCityFilter,
-  withCityScope
+  withCityScope,
+  buildParanoidOptions,
+  withAdminScope
 };

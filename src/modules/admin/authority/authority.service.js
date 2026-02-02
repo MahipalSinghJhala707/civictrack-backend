@@ -1,30 +1,48 @@
 const { Authority, Department, AuthorityIssue, Issue, sequelize } = require("../../../models");
 const httpError = require("../../../shared/utils/httpError.js");
-const { validateCityScope, applyCityFilter } = require("../../../shared/utils/cityScope.js");
+const { validateCityScope, applyCityFilter, buildParanoidOptions } = require("../../../shared/utils/cityScope.js");
 const {
   buildQueryOptions,
   buildPaginatedResponse
 } = require("../../../shared/utils/pagination.js");
+const { assertNotDeleted } = require("../../../shared/utils/softDelete.js");
 
+/**
+ * Department include for authority queries
+ * 
+ * SOFT-DELETE BEHAVIOR:
+ * - paranoid: true (default) excludes soft-deleted departments
+ * - required: false allows authorities with deleted departments to still appear
+ */
 const departmentInclude = {
   model: Department,
   as: "department",
-  attributes: ["id", "name"]
+  attributes: ["id", "name"],
+  required: false // Allow null if department was soft-deleted
+  // paranoid: true is default
 };
 
+/**
+ * Validate that a department exists and is active
+ */
 const ensureDepartmentExists = async (departmentId) => {
   if (!departmentId) return null;
   const department = await Department.findByPk(departmentId);
-  if (!department) {
-    throw httpError("Department not found.", 404);
-  }
+  // findByPk with paranoid: true (default) returns null if soft-deleted
+  assertNotDeleted(department, 'Department');
   return department;
 };
 
 module.exports = {
   /**
    * List authorities with city scoping and mandatory pagination
-   * @param {Object} adminContext - { adminCityId, includeAllCities }
+   * 
+   * SOFT-DELETE BEHAVIOR:
+   * - By default, excludes soft-deleted authorities (paranoid: true)
+   * - If adminContext.includeDeleted is true, includes soft-deleted authorities
+   *   (for admin audit/diagnostic purposes only)
+   * 
+   * @param {Object} adminContext - { adminCityId, includeAllCities, includeDeleted }
    * @param {Object} pagination - { page, limit, offset, sortBy, sortOrder, entityType }
    * @returns {Promise<{data: Array, meta: Object}>}
    */
@@ -32,6 +50,7 @@ module.exports = {
     validateCityScope(adminContext);
     
     const whereClause = applyCityFilter({}, adminContext, 'city_id');
+    const paranoidOptions = buildParanoidOptions(adminContext);
     
     // Build pagination options (defaults applied if not provided)
     const paginationOptions = buildQueryOptions({
@@ -43,6 +62,7 @@ module.exports = {
       where: whereClause,
       include: [departmentInclude],
       ...paginationOptions,
+      ...paranoidOptions, // Apply paranoid options from admin context
       distinct: true
     });
 

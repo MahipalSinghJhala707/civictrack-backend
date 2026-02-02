@@ -7,17 +7,25 @@ const {
 } = require("../../../models");
 
 const httpError = require("../../../shared/utils/httpError.js");
-const { validateCityScope, applyCityFilter } = require("../../../shared/utils/cityScope.js");
+const { validateCityScope, applyCityFilter, buildParanoidOptions } = require("../../../shared/utils/cityScope.js");
 const {
   buildQueryOptions,
   buildPaginatedResponse
 } = require("../../../shared/utils/pagination.js");
 
+/**
+ * Role include for user queries
+ * 
+ * SOFT-DELETE BEHAVIOR:
+ * - paranoid: true (default) excludes soft-deleted roles from the join
+ * - Users with deleted role assignments will have those roles excluded from response
+ */
 const roleInclude = {
   model: Role,
   as: "roles",
   attributes: ["id", "name", "description"],
   through: { attributes: [] }
+  // paranoid: true is default - soft-deleted roles excluded
 };
 
 const sanitizeRoleIds = (roleIds = []) => {
@@ -29,7 +37,13 @@ const sanitizeRoleIds = (roleIds = []) => {
 module.exports = {
   /**
    * List users with city scoping and mandatory pagination
-   * @param {Object} adminContext - { adminCityId, includeAllCities }
+   * 
+   * SOFT-DELETE BEHAVIOR:
+   * - By default, excludes soft-deleted users (paranoid: true)
+   * - If adminContext.includeDeleted is true, includes soft-deleted users
+   *   (for admin audit/diagnostic purposes only)
+   * 
+   * @param {Object} adminContext - { adminCityId, includeAllCities, includeDeleted }
    * @param {Object} pagination - { page, limit, offset, sortBy, sortOrder, entityType }
    * @returns {Promise<{data: Array, meta: Object}>}
    */
@@ -37,6 +51,7 @@ module.exports = {
     validateCityScope(adminContext);
     
     const whereClause = applyCityFilter({}, adminContext, 'city_id');
+    const paranoidOptions = buildParanoidOptions(adminContext);
     
     // Build pagination options (defaults applied if not provided)
     const paginationOptions = buildQueryOptions({
@@ -48,6 +63,7 @@ module.exports = {
       where: whereClause,
       include: [roleInclude],
       ...paginationOptions,
+      ...paranoidOptions, // Apply paranoid options from admin context
       distinct: true
     });
 
