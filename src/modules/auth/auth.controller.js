@@ -19,10 +19,15 @@ module.exports = {
     try {
       const { user, token } = await AuthService.login(req.body);
 
+      const isProduction = process.env.NODE_ENV === "production";
+
       res.cookie("token", token, {
         httpOnly: true,
-        sameSite: "None",
-        secure: process.env.NODE_ENV === "production",
+        // In production we need SameSite=None + Secure for cross-site cookies.
+        // In local development, browsers will reject SameSite=None without Secure,
+        // so we fall back to Lax to make sure the cookie is accepted.
+        sameSite: isProduction ? "None" : "Lax",
+        secure: isProduction,
         maxAge: 24 * 60 * 60 * 1000
       });
 

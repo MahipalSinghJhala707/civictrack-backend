@@ -14,6 +14,7 @@ const {
 } = require("../../models");
 const { uploadIssueImages } = require("./issue.s3.service.js");
 const httpError = require("../../shared/utils/httpError.js");
+const { validateCityScope, applyCityFilter } = require("../../shared/utils/cityScope.js");
 
 const parseNumber = (value) => {
   if (value === undefined || value === null || value === "") return null;
@@ -245,7 +246,7 @@ module.exports = {
     });
   },
 
-  async listReports(user, filters = {}) {
+  async listReports(user, filters = {}, adminContext = null) {
     const whereClause = {};
 
     const status = filters.status;
@@ -283,7 +284,12 @@ module.exports = {
       }
       whereClause.authority_id = authorityUser.authority_id;
     } else if (user.role === "admin") {
-      // no additional filters
+      // Admin queries are city-scoped by default
+      if (adminContext) {
+        validateCityScope(adminContext);
+        const cityFilter = applyCityFilter({}, adminContext, 'city_id');
+        Object.assign(whereClause, cityFilter);
+      }
     } else {
       throw toForbiddenError("Unsupported role for listing issues.");
     }
@@ -412,8 +418,17 @@ module.exports = {
     });
   },
 
-  async listFlaggedReports() {
+  /**
+   * List flagged reports with city scoping for admin
+   * @param {Object} adminContext - { adminCityId, includeAllCities }
+   */
+  async listFlaggedReports(adminContext = {}) {
+    validateCityScope(adminContext);
+    
+    const whereClause = applyCityFilter({}, adminContext, 'city_id');
+    
     return UserIssue.findAll({
+      where: whereClause,
       include: [
         ...baseReportInclude,
         {

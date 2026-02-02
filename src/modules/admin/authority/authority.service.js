@@ -1,5 +1,6 @@
 const { Authority, Department, AuthorityIssue, Issue, sequelize } = require("../../../models");
 const httpError = require("../../../shared/utils/httpError.js");
+const { validateCityScope, applyCityFilter } = require("../../../shared/utils/cityScope.js");
 
 const departmentInclude = {
   model: Department,
@@ -17,8 +18,17 @@ const ensureDepartmentExists = async (departmentId) => {
 };
 
 module.exports = {
-  async listAuthorities() {
+  /**
+   * List authorities with city scoping
+   * @param {Object} adminContext - { adminCityId, includeAllCities }
+   */
+  async listAuthorities(adminContext = {}) {
+    validateCityScope(adminContext);
+    
+    const whereClause = applyCityFilter({}, adminContext, 'city_id');
+    
     return Authority.findAll({
+      where: whereClause,
       include: [departmentInclude],
       order: [["createdAt", "DESC"]]
     });

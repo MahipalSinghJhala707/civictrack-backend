@@ -4,6 +4,7 @@ const {
   User
 } = require("../../../models");
 const httpError = require("../../../shared/utils/httpError.js");
+const { validateCityScope } = require("../../../shared/utils/cityScope.js");
 
 const authorityUserIncludes = [
   {
@@ -35,9 +36,33 @@ const ensureUserExists = async (userId) => {
 };
 
 module.exports = {
-  async listAuthorityUsers() {
+  /**
+   * List authority-user mappings with city scoping
+   * Filter based on the authority's city_id
+   * @param {Object} adminContext - { adminCityId, includeAllCities }
+   */
+  async listAuthorityUsers(adminContext = {}) {
+    validateCityScope(adminContext);
+    
+    const { adminCityId, includeAllCities } = adminContext;
+    
+    // Build authority include with optional city filter
+    const authorityIncludeWithFilter = {
+      model: Authority,
+      as: "authority",
+      attributes: ["id", "name", "city", "region", "city_id"],
+      ...(includeAllCities ? {} : { where: { city_id: adminCityId } })
+    };
+    
     return AuthorityUser.findAll({
-      include: authorityUserIncludes,
+      include: [
+        authorityIncludeWithFilter,
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "name", "email"]
+        }
+      ],
       order: [["createdAt", "DESC"]]
     });
   },

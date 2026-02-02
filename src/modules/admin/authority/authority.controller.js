@@ -1,9 +1,11 @@
 const AuthorityService = require("./authority.service.js");
+const { extractAdminContext } = require("../../../shared/utils/cityScope.js");
 
 module.exports = {
   async listAuthorities(req, res, next) {
     try {
-      const authorities = await AuthorityService.listAuthorities();
+      const adminContext = extractAdminContext(req);
+      const authorities = await AuthorityService.listAuthorities(adminContext);
       res.status(200).json({
         success: true,
         data: { authorities }

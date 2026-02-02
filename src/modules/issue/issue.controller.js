@@ -1,4 +1,5 @@
 const IssueService = require("./issue.service.js");
+const { extractAdminContext } = require("../../shared/utils/cityScope.js");
 
 module.exports = {
   async listCategories(req, res, next) {
@@ -56,7 +57,9 @@ module.exports = {
 
   async listReports(req, res, next) {
     try {
-      const reports = await IssueService.listReports(req.user, req.query);
+      // Pass admin context only for admin users
+      const adminContext = req.user.role === 'admin' ? extractAdminContext(req) : null;
+      const reports = await IssueService.listReports(req.user, req.query, adminContext);
 
       // Ensure images array is always present for each report
       const reportsWithImages = reports.map(report => {
@@ -136,7 +139,8 @@ module.exports = {
 
   async listFlaggedReports(req, res, next) {
     try {
-      const reports = await IssueService.listFlaggedReports();
+      const adminContext = extractAdminContext(req);
+      const reports = await IssueService.listFlaggedReports(adminContext);
 
       return res.status(200).json({
         success: true,

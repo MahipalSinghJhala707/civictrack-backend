@@ -1,9 +1,11 @@
 const UserService = require("./user.service.js");
+const { extractAdminContext } = require("../../../shared/utils/cityScope.js");
 
 module.exports = {
   async listUsers(req, res, next) {
     try {
-      const users = await UserService.listUsers();
+      const adminContext = extractAdminContext(req);
+      const users = await UserService.listUsers(adminContext);
       res.status(200).json({
         success: true,
         data: { users }

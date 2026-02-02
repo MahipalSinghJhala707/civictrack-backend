@@ -7,6 +7,7 @@ const {
 } = require("../../../models");
 
 const httpError = require("../../../shared/utils/httpError.js");
+const { validateCityScope, applyCityFilter } = require("../../../shared/utils/cityScope.js");
 
 const roleInclude = {
   model: Role,
@@ -22,8 +23,17 @@ const sanitizeRoleIds = (roleIds = []) => {
 };
 
 module.exports = {
-  async listUsers() {
+  /**
+   * List users with city scoping
+   * @param {Object} adminContext - { adminCityId, includeAllCities }
+   */
+  async listUsers(adminContext = {}) {
+    validateCityScope(adminContext);
+    
+    const whereClause = applyCityFilter({}, adminContext, 'city_id');
+    
     return User.findAll({
+      where: whereClause,
       include: [roleInclude],
       order: [["createdAt", "DESC"]]
     });
