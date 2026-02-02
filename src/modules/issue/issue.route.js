@@ -69,4 +69,39 @@ router.patch(
   IssueController.toggleReportVisibility
 );
 
+/**
+ * Assignment Management Routes (admin-only)
+ */
+
+// Reassign authority for a report
+// POST /issues/reports/:reportId/reassign
+// Body: { authorityId: number | null }
+router.post(
+  "/reports/:reportId/reassign",
+  allowRoles("admin"),
+  reportIdParamValidator,
+  validate,
+  IssueController.reassignAuthority
+);
+
+// Retry automatic assignment for an unassigned report
+// POST /issues/reports/:reportId/retry-assignment
+router.post(
+  "/reports/:reportId/retry-assignment",
+  allowRoles("admin"),
+  reportIdParamValidator,
+  validate,
+  IssueController.retryAssignment
+);
+
+// Get assignment history for a report
+// GET /issues/reports/:reportId/assignment-history
+router.get(
+  "/reports/:reportId/assignment-history",
+  allowRoles("admin", "authority"),
+  reportIdParamValidator,
+  validate,
+  IssueController.getAssignmentHistory
+);
+
 module.exports = router;

@@ -5,72 +5,29 @@ const {
   IssueImage,
   Authority,
   AuthorityUser,
-  AuthorityIssue,
   UserIssueFlag,
   Flag,
   Log,
   User,
+  City,
   sequelize
 } = require("../../models");
 const { uploadIssueImages } = require("./issue.s3.service.js");
 const httpError = require("../../shared/utils/httpError.js");
 const { validateCityScope, applyCityFilter } = require("../../shared/utils/cityScope.js");
+const {
+  assignAuthority,
+  reassignAuthority,
+  retryAssignment,
+  getAssignmentHistory,
+  ASSIGNMENT_OUTCOMES,
+  TRIGGER_TYPES
+} = require("./assignment.service.js");
 
 const parseNumber = (value) => {
   if (value === undefined || value === null || value === "") return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
-};
-
-/**
- * Automatically assign authority to an issue based on strict matching:
- * All three conditions must match:
- * 1. Issue category (issue_id) - via AuthorityIssue mapping
- * 2. Region (zone) - must match authority's region
- * 3. City - must match authority's city
- * 
- * @param {number} issueId - The issue category ID
- * @param {string} region - Region/zone name (required)
- * @param {string} city - City name (required)
- * @returns {Promise<Authority|null>} - The assigned authority or null if no match
- */
-const autoAssignAuthority = async (issueId, region, city) => {
-  // All three parameters are required for assignment
-  if (!issueId || !region || !city) {
-    return null;
-  }
-
-  // Find authorities mapped to this issue category via AuthorityIssue junction table
-  const authorityIssues = await AuthorityIssue.findAll({
-    where: { issue_id: issueId }
-  });
-
-  if (authorityIssues.length === 0) {
-    return null;
-  }
-
-  // Extract authority IDs from the mappings
-  const authorityIds = authorityIssues.map(ai => ai.authority_id);
-
-  // Find the authority that matches all three conditions:
-  // 1. Is mapped to this issue category (via AuthorityIssue)
-  // 2. Region matches (case-insensitive)
-  // 3. City matches (case-insensitive)
-  const matchingAuthority = await Authority.findOne({
-    where: {
-      id: {
-        [Op.in]: authorityIds
-      },
-      region: {
-        [Op.iLike]: region.trim()
-      },
-      city: {
-        [Op.iLike]: city.trim()
-      }
-    }
-  });
-
-  return matchingAuthority || null;
 };
 
 const baseReportInclude = [
@@ -82,12 +39,18 @@ const baseReportInclude = [
   {
     model: Authority,
     as: "authority",
-    attributes: ["id", "name", "city", "region"]
+    attributes: ["id", "name", "city", "region", "city_id"]
   },
   {
     model: User,
     as: "reporter",
     attributes: ["id", "name", "email"]
+  },
+  {
+    model: City,
+    as: "city",
+    attributes: ["id", "name", "state"],
+    required: false
   },
   {
     model: IssueImage,
@@ -144,7 +107,8 @@ module.exports = {
       latitude,
       longitude,
       region,
-      city,
+      city,       // City name (string)
+      cityId,     // City ID (optional, preferred over city name)
       imageUrls = []
     } = payload;
 
@@ -159,10 +123,14 @@ module.exports = {
       throw toNotFoundError("Selected issue category does not exist.");
     }
 
-    // Auto-assign authority based on strict matching: issue_id, region, and city
-    // All three must match for assignment
-    const authorityRecord = await autoAssignAuthority(issueIdNum, region, city);
-    // If auto-assignment fails, authorityRecord will be null (issue can still be created)
+    // Resolve city_id: prefer explicit cityId, otherwise look up by name
+    let resolvedCityId = parseNumber(cityId);
+    if (!resolvedCityId && city) {
+      const cityRecord = await City.findOne({
+        where: { name: { [Op.iLike]: String(city).trim() } }
+      });
+      resolvedCityId = cityRecord ? cityRecord.id : null;
+    }
 
     const providedImageUrls = Array.isArray(imageUrls)
       ? imageUrls
@@ -205,17 +173,18 @@ module.exports = {
     const allImageUrls = [...sanitizedProvidedUrls, ...uploadedImageUrls];
 
     return sequelize.transaction(async (transaction) => {
+      // Create the report initially without authority (will be assigned by the engine)
       const report = await UserIssue.create(
         {
           title,
           description,
           issue_id: issueIdNum,
           reporter_id: userId,
-          authority_id: authorityRecord ? authorityRecord.id : null,
+          authority_id: null, // Will be set by assignment engine
           latitude: latitude ? parseNumber(latitude) : null,
           longitude: longitude ? parseNumber(longitude) : null,
-          region: region ? String(region).trim() : null
-          // Note: city is not stored in user_issue table, only used for authority matching
+          region: region ? String(region).trim() : null,
+          city_id: resolvedCityId
         },
         { transaction }
       );
@@ -228,6 +197,7 @@ module.exports = {
         await IssueImage.bulkCreate(imagesPayload, { transaction });
       }
 
+      // Log the initial report creation
       await Log.create(
         {
           issue_id: report.id,
@@ -239,10 +209,49 @@ module.exports = {
         { transaction }
       );
 
-      return UserIssue.findByPk(report.id, {
+      // Use the deterministic assignment engine
+      // This handles all assignment outcomes and logging internally
+      let assignmentResult = { outcome: null, authorityId: null, reason: 'Assignment skipped' };
+      
+      if (resolvedCityId && issueIdNum) {
+        try {
+          assignmentResult = await assignAuthority({
+            reportId: report.id,
+            issueCategoryId: issueIdNum,
+            cityId: resolvedCityId,
+            region: region ? String(region).trim() : null,
+            triggeredBy: TRIGGER_TYPES.SYSTEM,
+            systemUserId: userId,
+            transaction
+          });
+        } catch (assignmentError) {
+          // Log but don't fail report creation - assignment can be retried
+          console.error("Authority assignment failed:", assignmentError.message);
+          assignmentResult = {
+            outcome: ASSIGNMENT_OUTCOMES.UNASSIGNED_CONFIGURATION_ERROR,
+            authorityId: null,
+            reason: `Assignment error: ${assignmentError.message}`
+          };
+        }
+      } else {
+        // Cannot assign without city_id
+        assignmentResult = {
+          outcome: ASSIGNMENT_OUTCOMES.UNASSIGNED_CONFIGURATION_ERROR,
+          authorityId: null,
+          reason: 'Cannot assign authority without city_id'
+        };
+      }
+
+      // Fetch the final report with all associations
+      const finalReport = await UserIssue.findByPk(report.id, {
         include: [...baseReportInclude, flagInclude],
         transaction
       });
+
+      // Attach assignment metadata to the response
+      finalReport.dataValues.assignmentResult = assignmentResult;
+
+      return finalReport;
     });
   },
 
@@ -451,5 +460,67 @@ module.exports = {
     return UserIssue.findByPk(report.id, {
       include: [...baseReportInclude, flagInclude]
     });
-  }
+  },
+
+  /**
+   * Reassign authority for a report (admin-only)
+   * 
+   * @param {number} reportId - Report ID
+   * @param {number|null} targetAuthorityId - New authority ID (null to unassign)
+   * @param {number} adminUserId - Admin user performing the action
+   * @returns {Promise<{report: UserIssue, assignmentResult: Object}>}
+   */
+  async reassignReportAuthority(reportId, targetAuthorityId, adminUserId) {
+    const assignmentResult = await reassignAuthority({
+      reportId,
+      targetAuthorityId,
+      adminUserId
+    });
+
+    const report = await UserIssue.findByPk(reportId, {
+      include: [...baseReportInclude, flagInclude]
+    });
+
+    return { report, assignmentResult };
+  },
+
+  /**
+   * Retry automatic assignment for an unassigned report (admin-only)
+   * Useful after authority configuration changes
+   * 
+   * @param {number} reportId - Report ID
+   * @param {number} adminUserId - Admin user triggering retry
+   * @returns {Promise<{report: UserIssue, assignmentResult: Object}>}
+   */
+  async retryReportAssignment(reportId, adminUserId) {
+    const assignmentResult = await retryAssignment({
+      reportId,
+      adminUserId
+    });
+
+    const report = await UserIssue.findByPk(reportId, {
+      include: [...baseReportInclude, flagInclude]
+    });
+
+    return { report, assignmentResult };
+  },
+
+  /**
+   * Get assignment history for a report
+   * 
+   * @param {number} reportId - Report ID
+   * @returns {Promise<Array>} Assignment log entries
+   */
+  async getReportAssignmentHistory(reportId) {
+    const report = await UserIssue.findByPk(reportId);
+    if (!report) {
+      throw toNotFoundError("Issue report not found.");
+    }
+
+    return getAssignmentHistory(reportId);
+  },
+
+  // Re-export assignment constants for controllers
+  ASSIGNMENT_OUTCOMES,
+  TRIGGER_TYPES
 };
