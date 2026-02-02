@@ -33,6 +33,11 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'issue_id',
         as: 'logs'
       });
+
+      UserIssue.belongsTo(models.City, {
+        foreignKey: 'city_id',
+        as: 'city'
+      });
     }
   }
 
@@ -82,6 +87,10 @@ module.exports = (sequelize, DataTypes) => {
     is_hidden: {
       type: DataTypes.BOOLEAN,
       defaultValue: false
+    },
+    city_id: {
+      type: DataTypes.BIGINT,
+      allowNull: true
     }
   }, {
     sequelize,

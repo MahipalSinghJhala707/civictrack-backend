@@ -30,6 +30,11 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'user_id',
         as: 'authorityUser'
       });
+
+      User.belongsTo(models.City, {
+        foreignKey: 'city_id',
+        as: 'city'
+      });
     }
   }
 
@@ -51,6 +56,10 @@ module.exports = (sequelize, DataTypes) => {
     password_hash: {
       type: DataTypes.STRING(255),
       allowNull: false
+    },
+    city_id: {
+      type: DataTypes.BIGINT,
+      allowNull: true
     }
   }, {
     sequelize,

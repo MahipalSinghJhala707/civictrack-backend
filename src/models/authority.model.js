@@ -18,6 +18,11 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'authority_id',
         as: 'authorityUsers'
       });
+
+      Authority.belongsTo(models.City, {
+        foreignKey: 'city_id',
+        as: 'cityRecord'
+      });
     }
   }
 
@@ -45,6 +50,10 @@ module.exports = (sequelize, DataTypes) => {
     },
     address: {
       type: DataTypes.TEXT,
+      allowNull: true
+    },
+    city_id: {
+      type: DataTypes.BIGINT,
       allowNull: true
     }
   }, {
