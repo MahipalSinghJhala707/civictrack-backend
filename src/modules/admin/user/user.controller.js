@@ -1,14 +1,17 @@
 const UserService = require("./user.service.js");
 const { extractAdminContext } = require("../../../shared/utils/cityScope.js");
+const { extractPaginationContext } = require("../../../shared/utils/pagination.js");
 
 module.exports = {
   async listUsers(req, res, next) {
     try {
       const adminContext = extractAdminContext(req);
-      const users = await UserService.listUsers(adminContext);
+      const pagination = extractPaginationContext(req, 'users');
+      const result = await UserService.listUsers(adminContext, pagination);
       res.status(200).json({
         success: true,
-        data: { users }
+        data: { users: result.data },
+        meta: result.meta
       });
     } catch (err) {
       next(err);

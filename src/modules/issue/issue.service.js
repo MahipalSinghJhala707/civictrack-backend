@@ -16,6 +16,10 @@ const { uploadIssueImages } = require("./issue.s3.service.js");
 const httpError = require("../../shared/utils/httpError.js");
 const { validateCityScope, applyCityFilter } = require("../../shared/utils/cityScope.js");
 const {
+  buildQueryOptions,
+  buildPaginatedResponse
+} = require("../../shared/utils/pagination.js");
+const {
   assignAuthority,
   reassignAuthority,
   retryAssignment,
@@ -255,7 +259,15 @@ module.exports = {
     });
   },
 
-  async listReports(user, filters = {}, adminContext = null) {
+  /**
+   * List reports with mandatory pagination and ordering
+   * @param {Object} user - Current user
+   * @param {Object} filters - Query filters (status, issueId, region, myIssues)
+   * @param {Object} adminContext - { adminCityId, includeAllCities }
+   * @param {Object} pagination - { page, limit, offset, sortBy, sortOrder, entityType }
+   * @returns {Promise<{data: Array, meta: Object}>}
+   */
+  async listReports(user, filters = {}, adminContext = null, pagination = {}) {
     const whereClause = {};
 
     const status = filters.status;
@@ -303,10 +315,22 @@ module.exports = {
       throw toForbiddenError("Unsupported role for listing issues.");
     }
 
-    return UserIssue.findAll({
+    // Build pagination options (defaults applied if not provided)
+    const paginationOptions = buildQueryOptions({
+      ...pagination,
+      entityType: 'issues'
+    });
+
+    const { rows, count } = await UserIssue.findAndCountAll({
       where: whereClause,
-      order: [["createdAt", "DESC"]],
-      include: [...baseReportInclude, flagInclude]
+      include: [...baseReportInclude, flagInclude],
+      ...paginationOptions,
+      distinct: true
+    });
+
+    return buildPaginatedResponse(rows, count, {
+      page: pagination.page || 1,
+      limit: pagination.limit || 20
     });
   },
 
@@ -428,15 +452,23 @@ module.exports = {
   },
 
   /**
-   * List flagged reports with city scoping for admin
+   * List flagged reports with city scoping and mandatory pagination
    * @param {Object} adminContext - { adminCityId, includeAllCities }
+   * @param {Object} pagination - { page, limit, offset, sortBy, sortOrder, entityType }
+   * @returns {Promise<{data: Array, meta: Object}>}
    */
-  async listFlaggedReports(adminContext = {}) {
+  async listFlaggedReports(adminContext = {}, pagination = {}) {
     validateCityScope(adminContext);
     
     const whereClause = applyCityFilter({}, adminContext, 'city_id');
     
-    return UserIssue.findAll({
+    // Build pagination options (defaults applied if not provided)
+    const paginationOptions = buildQueryOptions({
+      ...pagination,
+      entityType: 'flaggedReports'
+    });
+
+    const { rows, count } = await UserIssue.findAndCountAll({
       where: whereClause,
       include: [
         ...baseReportInclude,
@@ -445,7 +477,13 @@ module.exports = {
           required: true
         }
       ],
-      order: [["updatedAt", "DESC"]]
+      ...paginationOptions,
+      distinct: true
+    });
+
+    return buildPaginatedResponse(rows, count, {
+      page: pagination.page || 1,
+      limit: pagination.limit || 20
     });
   },
 

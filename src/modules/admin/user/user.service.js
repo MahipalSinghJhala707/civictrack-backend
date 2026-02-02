@@ -8,6 +8,10 @@ const {
 
 const httpError = require("../../../shared/utils/httpError.js");
 const { validateCityScope, applyCityFilter } = require("../../../shared/utils/cityScope.js");
+const {
+  buildQueryOptions,
+  buildPaginatedResponse
+} = require("../../../shared/utils/pagination.js");
 
 const roleInclude = {
   model: Role,
@@ -24,18 +28,32 @@ const sanitizeRoleIds = (roleIds = []) => {
 
 module.exports = {
   /**
-   * List users with city scoping
+   * List users with city scoping and mandatory pagination
    * @param {Object} adminContext - { adminCityId, includeAllCities }
+   * @param {Object} pagination - { page, limit, offset, sortBy, sortOrder, entityType }
+   * @returns {Promise<{data: Array, meta: Object}>}
    */
-  async listUsers(adminContext = {}) {
+  async listUsers(adminContext = {}, pagination = {}) {
     validateCityScope(adminContext);
     
     const whereClause = applyCityFilter({}, adminContext, 'city_id');
     
-    return User.findAll({
+    // Build pagination options (defaults applied if not provided)
+    const paginationOptions = buildQueryOptions({
+      ...pagination,
+      entityType: 'users'
+    });
+
+    const { rows, count } = await User.findAndCountAll({
       where: whereClause,
       include: [roleInclude],
-      order: [["createdAt", "DESC"]]
+      ...paginationOptions,
+      distinct: true
+    });
+
+    return buildPaginatedResponse(rows, count, {
+      page: pagination.page || 1,
+      limit: pagination.limit || 20
     });
   },
 

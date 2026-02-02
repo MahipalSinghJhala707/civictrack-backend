@@ -1,6 +1,10 @@
 const { Authority, Department, AuthorityIssue, Issue, sequelize } = require("../../../models");
 const httpError = require("../../../shared/utils/httpError.js");
 const { validateCityScope, applyCityFilter } = require("../../../shared/utils/cityScope.js");
+const {
+  buildQueryOptions,
+  buildPaginatedResponse
+} = require("../../../shared/utils/pagination.js");
 
 const departmentInclude = {
   model: Department,
@@ -19,18 +23,32 @@ const ensureDepartmentExists = async (departmentId) => {
 
 module.exports = {
   /**
-   * List authorities with city scoping
+   * List authorities with city scoping and mandatory pagination
    * @param {Object} adminContext - { adminCityId, includeAllCities }
+   * @param {Object} pagination - { page, limit, offset, sortBy, sortOrder, entityType }
+   * @returns {Promise<{data: Array, meta: Object}>}
    */
-  async listAuthorities(adminContext = {}) {
+  async listAuthorities(adminContext = {}, pagination = {}) {
     validateCityScope(adminContext);
     
     const whereClause = applyCityFilter({}, adminContext, 'city_id');
     
-    return Authority.findAll({
+    // Build pagination options (defaults applied if not provided)
+    const paginationOptions = buildQueryOptions({
+      ...pagination,
+      entityType: 'authorities'
+    });
+
+    const { rows, count } = await Authority.findAndCountAll({
       where: whereClause,
       include: [departmentInclude],
-      order: [["createdAt", "DESC"]]
+      ...paginationOptions,
+      distinct: true
+    });
+
+    return buildPaginatedResponse(rows, count, {
+      page: pagination.page || 1,
+      limit: pagination.limit || 20
     });
   },
 

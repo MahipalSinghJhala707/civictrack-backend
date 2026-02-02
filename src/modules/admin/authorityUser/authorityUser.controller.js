@@ -1,14 +1,17 @@
 const AuthorityUserService = require("./authorityUser.service.js");
 const { extractAdminContext } = require("../../../shared/utils/cityScope.js");
+const { extractPaginationContext } = require("../../../shared/utils/pagination.js");
 
 module.exports = {
   async listAuthorityUsers(req, res, next) {
     try {
       const adminContext = extractAdminContext(req);
-      const authorityUsers = await AuthorityUserService.listAuthorityUsers(adminContext);
+      const pagination = extractPaginationContext(req, 'authorityUsers');
+      const result = await AuthorityUserService.listAuthorityUsers(adminContext, pagination);
       res.status(200).json({
         success: true,
-        data: { authorityUsers }
+        data: { authorityUsers: result.data },
+        meta: result.meta
       });
     } catch (err) {
       next(err);

@@ -1,5 +1,6 @@
 const IssueService = require("./issue.service.js");
 const { extractAdminContext } = require("../../shared/utils/cityScope.js");
+const { extractPaginationContext } = require("../../shared/utils/pagination.js");
 
 module.exports = {
   async listCategories(req, res, next) {
@@ -59,10 +60,11 @@ module.exports = {
     try {
       // Pass admin context only for admin users
       const adminContext = req.user.role === 'admin' ? extractAdminContext(req) : null;
-      const reports = await IssueService.listReports(req.user, req.query, adminContext);
+      const pagination = extractPaginationContext(req, 'issues');
+      const result = await IssueService.listReports(req.user, req.query, adminContext, pagination);
 
       // Ensure images array is always present for each report
-      const reportsWithImages = reports.map(report => {
+      const reportsWithImages = result.data.map(report => {
         const reportData = report.toJSON ? report.toJSON() : report;
         // Ensure images is always an array
         if (!reportData.images || !Array.isArray(reportData.images)) {
@@ -75,12 +77,12 @@ module.exports = {
         success: true,
         data: { 
           reports: reportsWithImages,
-          count: reportsWithImages.length,
           user: {
             id: req.user.id,
             role: req.user.role
           }
-        }
+        },
+        meta: result.meta
       });
     } catch (err) {
       next(err);
@@ -140,11 +142,13 @@ module.exports = {
   async listFlaggedReports(req, res, next) {
     try {
       const adminContext = extractAdminContext(req);
-      const reports = await IssueService.listFlaggedReports(adminContext);
+      const pagination = extractPaginationContext(req, 'flaggedReports');
+      const result = await IssueService.listFlaggedReports(adminContext, pagination);
 
       return res.status(200).json({
         success: true,
-        data: { reports }
+        data: { reports: result.data },
+        meta: result.meta
       });
     } catch (err) {
       next(err);

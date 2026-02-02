@@ -5,6 +5,10 @@ const {
 } = require("../../../models");
 const httpError = require("../../../shared/utils/httpError.js");
 const { validateCityScope } = require("../../../shared/utils/cityScope.js");
+const {
+  buildQueryOptions,
+  buildPaginatedResponse
+} = require("../../../shared/utils/pagination.js");
 
 const authorityUserIncludes = [
   {
@@ -37,11 +41,13 @@ const ensureUserExists = async (userId) => {
 
 module.exports = {
   /**
-   * List authority-user mappings with city scoping
+   * List authority-user mappings with city scoping and mandatory pagination
    * Filter based on the authority's city_id
    * @param {Object} adminContext - { adminCityId, includeAllCities }
+   * @param {Object} pagination - { page, limit, offset, sortBy, sortOrder, entityType }
+   * @returns {Promise<{data: Array, meta: Object}>}
    */
-  async listAuthorityUsers(adminContext = {}) {
+  async listAuthorityUsers(adminContext = {}, pagination = {}) {
     validateCityScope(adminContext);
     
     const { adminCityId, includeAllCities } = adminContext;
@@ -54,7 +60,13 @@ module.exports = {
       ...(includeAllCities ? {} : { where: { city_id: adminCityId } })
     };
     
-    return AuthorityUser.findAll({
+    // Build pagination options (defaults applied if not provided)
+    const paginationOptions = buildQueryOptions({
+      ...pagination,
+      entityType: 'authorityUsers'
+    });
+
+    const { rows, count } = await AuthorityUser.findAndCountAll({
       include: [
         authorityIncludeWithFilter,
         {
@@ -63,7 +75,13 @@ module.exports = {
           attributes: ["id", "name", "email"]
         }
       ],
-      order: [["createdAt", "DESC"]]
+      ...paginationOptions,
+      distinct: true
+    });
+
+    return buildPaginatedResponse(rows, count, {
+      page: pagination.page || 1,
+      limit: pagination.limit || 20
     });
   },
 
