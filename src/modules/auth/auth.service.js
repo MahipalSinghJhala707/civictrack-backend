@@ -1,13 +1,21 @@
 const bcrypt = require("bcrypt");
 const { EncryptJWT } = require("jose");
 const crypto = require("crypto");
-const { User, UserRole, Role, sequelize } = require("../../models");
+const { User, UserRole, Role, City, sequelize } = require("../../models");
 
 module.exports = {
-  async register({ name, email, password }) {
+  async register({ name, email, password, cityId }) {
     const t = await sequelize.transaction();
 
     try {
+      // Validate city exists
+      const city = await City.findByPk(cityId);
+      if (!city) {
+        const err = new Error("Please select a valid city.");
+        err.statusCode = 400;
+        throw err;
+      }
+
       const existing = await User.findOne({ where: { email } });
       if (existing) {
         const err = new Error("This email is already registered.");
@@ -18,7 +26,7 @@ module.exports = {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       const user = await User.create(
-        { name, email, password_hash: hashedPassword },
+        { name, email, password_hash: hashedPassword, city_id: cityId },
         { transaction: t }
       );
 
@@ -98,7 +106,7 @@ module.exports = {
         "sha256"
       );
       
-      const token = await new EncryptJWT({ id: user.id, role })
+      const token = await new EncryptJWT({ id: user.id, role, city_id: user.city_id })
         .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
         .setIssuedAt()
         .setExpirationTime(process.env.JWT_EXPIRES_IN || "2h")
@@ -142,5 +150,12 @@ module.exports = {
       if (!err.statusCode) err.statusCode = 500;
       throw err;
     }
+  },
+
+  async listCities() {
+    return City.findAll({
+      attributes: ["id", "name", "state"],
+      order: [["name", "ASC"]]
+    });
   }
 };

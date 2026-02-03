@@ -8,7 +8,7 @@ module.exports = {
         id: {
           type: Sequelize.BIGINT,
           primaryKey: true,
-          autoIncrement: truecls
+          autoIncrement: true
         },
         name: {
           type: Sequelize.STRING(100),

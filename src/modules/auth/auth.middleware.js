@@ -1,5 +1,6 @@
 const { jwtDecrypt } = require("jose");
 const crypto = require("crypto");
+const { User } = require("../../models");
 
 module.exports = async (req, res, next) => {
   try {
@@ -70,9 +71,17 @@ module.exports = async (req, res, next) => {
       throw err;
     }
 
+    // If city_id is not in token (old tokens), fetch from database
+    let cityId = decoded.city_id || null;
+    if (!cityId && decoded.role === "citizen") {
+      const user = await User.findByPk(decoded.id, { attributes: ["city_id"] });
+      cityId = user?.city_id || null;
+    }
+
     req.user = {
       id: decoded.id,
-      role: decoded.role
+      role: decoded.role,
+      city_id: cityId
     };
 
     next();

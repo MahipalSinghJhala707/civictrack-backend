@@ -1,6 +1,18 @@
 const AuthService = require("./auth.service.js");
 
 module.exports = {
+  async listCities(req, res, next) {
+    try {
+      const cities = await AuthService.listCities();
+      return res.status(200).json({
+        success: true,
+        data: { cities }
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async register(req, res, next) {
     try {
       const user = await AuthService.register(req.body);

@@ -325,12 +325,18 @@ module.exports = {
     let paranoidOptions = {};
 
     if (user.role === "citizen") {
-      // Citizens can see all public issues (not hidden)
-      // Optionally filter by region if provided
+      // CRITICAL: Citizens MUST have a city_id
+      if (!user.city_id) {
+        throw toForbiddenError("Your account is not associated with a city. Please contact support.");
+      }
+      
+      // ALWAYS filter by user's city - citizens can only see issues in their city
+      whereClause.city_id = user.city_id;
+      
+      // ALWAYS exclude hidden reports for citizens
       whereClause.is_hidden = false;
       
-      // If user wants to see only their own issues, they can filter by reporter_id
-      // Otherwise, show all public issues
+      // If user wants to see only their own issues, add reporter_id filter
       if (filters.myIssues === "true" || filters.myIssues === true) {
         whereClause.reporter_id = user.id;
       }

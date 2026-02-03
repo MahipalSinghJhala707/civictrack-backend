@@ -6,6 +6,9 @@ const authMiddleware = require("./auth.middleware.js");
 const { registerValidator, loginValidator, changePasswordValidator } = require("./auth.validator.js");
 const validate = require("../../shared/middleware/validate.js");
 
+// Public route - no auth required (needed for registration form)
+router.get("/cities", AuthController.listCities);
+
 router.post("/register", registerValidator, validate, AuthController.register);
 
 router.post("/login", loginValidator, validate, AuthController.login);
