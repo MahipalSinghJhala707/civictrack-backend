@@ -65,7 +65,7 @@ function validateCityScope(context) {
 
   if (!includeAllCities && !adminCityId) {
     throw httpError(
-      'City scope required. Provide cityId parameter or set includeAllCities=true for cross-city query.',
+      'Please select a city to view data, or enable cross-city access.',
       400
     );
   }

@@ -394,7 +394,7 @@ async function handleAdminReassignment({
 
     if (deletedAuthority && !isActive(deletedAuthority)) {
       throw httpError(
-        `Authority "${deletedAuthority.name}" is inactive and cannot be assigned`,
+        `"${deletedAuthority.name}" is no longer active and cannot receive new assignments.`,
         400
       );
     }
@@ -404,7 +404,7 @@ async function handleAdminReassignment({
 
   if (targetAuthority.city_id !== cityId) {
     throw httpError(
-      `Authority "${targetAuthority.name}" belongs to a different city. Cross-city reassignment is not allowed.`,
+      `Cannot assign to "${targetAuthority.name}" because it belongs to a different city.`,
       400
     );
   }

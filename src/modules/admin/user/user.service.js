@@ -94,7 +94,7 @@ module.exports = {
         });
 
         if (foundRoles.length !== rolesToAssign.length) {
-          throw httpError("One or more roles do not exist.", 404);
+          throw httpError("One or more selected roles do not exist.", 404);
         }
 
         const userRoles = rolesToAssign.map((roleId) => ({

@@ -15,7 +15,7 @@ module.exports = {
   async updateDepartment(departmentId, payload) {
     const department = await Department.findByPk(departmentId);
     if (!department) {
-      throw httpError("Department not found.", 404);
+      throw httpError("The requested department was not found.", 404);
     }
 
     await department.update({
@@ -29,7 +29,7 @@ module.exports = {
   async deleteDepartment(departmentId) {
     const deleted = await Department.destroy({ where: { id: departmentId } });
     if (!deleted) {
-      throw httpError("Department not found.", 404);
+      throw httpError("The requested department was not found.", 404);
     }
   }
 };

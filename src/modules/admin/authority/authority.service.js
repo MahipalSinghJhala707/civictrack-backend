@@ -91,7 +91,7 @@ module.exports = {
   async updateAuthority(authorityId, payload) {
     const authority = await Authority.findByPk(authorityId);
     if (!authority) {
-      throw httpError("Authority not found.", 404);
+      throw httpError("The requested authority was not found.", 404);
     }
 
     if (payload.departmentId) {
@@ -117,14 +117,14 @@ module.exports = {
   async deleteAuthority(authorityId) {
     const deleted = await Authority.destroy({ where: { id: authorityId } });
     if (!deleted) {
-      throw httpError("Authority not found.", 404);
+      throw httpError("The requested authority was not found.", 404);
     }
   },
 
   async getAuthorityIssues(authorityId) {
     const authority = await Authority.findByPk(authorityId);
     if (!authority) {
-      throw httpError("Authority not found.", 404);
+      throw httpError("The requested authority was not found.", 404);
     }
 
     // Get all authority-issue mappings for this authority

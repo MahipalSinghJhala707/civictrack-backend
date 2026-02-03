@@ -58,7 +58,7 @@ describe('Soft Delete Utility', () => {
       
       expect(() => {
         assertNotDeleted(entity, 'TestEntity');
-      }).toThrow(/TestEntity not found/);
+      }).toThrow(/no longer available/);
     });
 
     it('should handle camelCase deletedAt field', () => {
@@ -66,7 +66,7 @@ describe('Soft Delete Utility', () => {
       
       expect(() => {
         assertNotDeleted(entity, 'TestEntity');
-      }).toThrow(/TestEntity not found/);
+      }).toThrow(/no longer available/);
     });
 
     it('should use default entity name "Record" when not provided', () => {

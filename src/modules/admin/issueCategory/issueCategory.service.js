@@ -12,7 +12,7 @@ module.exports = {
     // Check if category with same name already exists
     const existing = await Issue.findOne({ where: { name } });
     if (existing) {
-      throw httpError("Issue category with this name already exists.", 409);
+      throw httpError("An issue category with this name already exists.", 409);
     }
 
     // Generate slug from name if not provided
@@ -24,14 +24,14 @@ module.exports = {
   async updateIssueCategory(categoryId, payload) {
     const category = await Issue.findByPk(categoryId);
     if (!category) {
-      throw httpError("Issue category not found.", 404);
+      throw httpError("The requested issue category was not found.", 404);
     }
 
     // Check if new name conflicts with existing category
     if (payload.name && payload.name !== category.name) {
       const existing = await Issue.findOne({ where: { name: payload.name } });
       if (existing) {
-        throw httpError("Issue category with this name already exists.", 409);
+        throw httpError("An issue category with this name already exists.", 409);
       }
     }
 
@@ -47,7 +47,7 @@ module.exports = {
   async deleteIssueCategory(categoryId) {
     const deleted = await Issue.destroy({ where: { id: categoryId } });
     if (!deleted) {
-      throw httpError("Issue category not found.", 404);
+      throw httpError("The requested issue category was not found.", 404);
     }
   }
 };

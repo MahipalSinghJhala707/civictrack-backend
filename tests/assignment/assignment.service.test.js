@@ -465,7 +465,7 @@ describe('Assignment Service', () => {
         })
       ).rejects.toMatchObject({
         statusCode: 400,
-        message: expect.stringContaining('inactive')
+        message: expect.stringContaining('no longer active')
       });
     });
 

@@ -13,7 +13,7 @@ module.exports = async (req, res, next) => {
     const token = req.cookies?.token;
 
     if (!token) {
-      const err = new Error("Authentication required.");
+      const err = new Error("Please log in to access this resource.");
       err.statusCode = 401;
       throw err;
     }
@@ -22,7 +22,7 @@ module.exports = async (req, res, next) => {
     // This ensures the token is properly encrypted
     const tokenParts = token.split(".");
     if (tokenParts.length !== 5) {
-      const err = new Error("Invalid token format - token must be encrypted.");
+      const err = new Error("Your session is invalid. Please log in again.");
       err.statusCode = 401;
       throw err;
     }
@@ -51,21 +51,21 @@ module.exports = async (req, res, next) => {
     } catch (decryptError) {
       // If decryption fails, token is invalid - reject immediately
       // This means the token was not encrypted with our secret or has been tampered with
-      const err = new Error("Invalid or tampered token. Cannot decrypt without secret.");
+      const err = new Error("Your session is invalid. Please log in again.");
       err.statusCode = 401;
       throw err;
     }
 
     // Additional security: Verify token structure
     if (!decoded || typeof decoded !== "object") {
-      const err = new Error("Invalid token structure.");
+      const err = new Error("Your session is invalid. Please log in again.");
       err.statusCode = 401;
       throw err;
     }
 
     // Validate decoded payload
     if (!decoded.id || !decoded.role) {
-      const err = new Error("Invalid token payload.");
+      const err = new Error("Your session is invalid. Please log in again.");
       err.statusCode = 401;
       throw err;
     }
@@ -80,10 +80,10 @@ module.exports = async (req, res, next) => {
   } catch (err) {
     // JWE/JWT error handling
     if (err.code === "ERR_JWT_EXPIRED" || err.message?.includes("expired")) {
-      err = new Error("Session expired. Please log in again.");
+      err = new Error("Your session has expired. Please log in again.");
       err.statusCode = 401;
     } else if (err.code === "ERR_JWT_INVALID" || err.message?.includes("decrypt") || err.message?.includes("Invalid")) {
-      err = new Error("Invalid or tampered token. Cannot decrypt without secret.");
+      err = new Error("Your session is invalid. Please log in again.");
       err.statusCode = 401;
     } else if (!err.statusCode) {
       err.statusCode = 401;

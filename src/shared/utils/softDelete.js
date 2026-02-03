@@ -33,12 +33,12 @@ function assertNotDeleted(entity, entityName = 'Record') {
 
   // Check for soft-delete timestamp (snake_case due to underscored: true)
   if (entity.deleted_at !== null && entity.deleted_at !== undefined) {
-    throw httpError(`${entityName} not found.`, 404);
+    throw httpError(`This ${entityName.toLowerCase()} is no longer available.`, 404);
   }
 
   // Also check camelCase variant for safety
   if (entity.deletedAt !== null && entity.deletedAt !== undefined) {
-    throw httpError(`${entityName} not found.`, 404);
+    throw httpError(`This ${entityName.toLowerCase()} is no longer available.`, 404);
   }
 }
 

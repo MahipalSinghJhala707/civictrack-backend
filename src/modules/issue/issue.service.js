@@ -148,12 +148,12 @@ module.exports = {
     // Convert issueId to number (form data sends as string)
     const issueIdNum = parseNumber(issueId);
     if (!issueIdNum) {
-      throw httpError("A valid issue category is required.", 422);
+      throw httpError("Please select an issue category for your report.", 422);
     }
 
     const issueCategory = await Issue.findByPk(issueIdNum);
     if (!issueCategory) {
-      throw toNotFoundError("Selected issue category does not exist.");
+      throw toNotFoundError("The selected issue category no longer exists. Please choose another.");
     }
 
     // Resolve city_id: prefer explicit cityId, otherwise look up by name
@@ -339,7 +339,7 @@ module.exports = {
         where: { user_id: user.id }
       });
       if (!authorityUser) {
-        throw toForbiddenError("Authority mapping missing for this account.");
+        throw toForbiddenError("Your account is not linked to an authority. Please contact an administrator.");
       }
       whereClause.authority_id = authorityUser.authority_id;
     } else if (user.role === "admin") {
@@ -352,7 +352,7 @@ module.exports = {
         paranoidOptions = buildParanoidOptions(adminContext);
       }
     } else {
-      throw toForbiddenError("Unsupported role for listing issues.");
+      throw toForbiddenError("You do not have permission to view issues with this role.");
     }
 
     // Build pagination options (defaults applied if not provided)
@@ -386,7 +386,7 @@ module.exports = {
 
     if (user.role === "citizen") {
       if (report.is_hidden && report.reporter_id !== user.id) {
-        throw toForbiddenError("You do not have access to this report.");
+        throw toForbiddenError("This report is not available for viewing.");
       }
       return report;
     } else if (user.role === "authority") {
@@ -394,13 +394,13 @@ module.exports = {
         where: { user_id: user.id }
       });
       if (!authorityUser || authorityUser.authority_id !== report.authority_id) {
-        throw toForbiddenError("You do not have access to this report.");
+        throw toForbiddenError("This report is not assigned to your authority.");
       }
       return report;
     } else if (user.role === "admin") {
       return report;
     } else {
-      throw toForbiddenError("Unsupported role for accessing reports.");
+      throw toForbiddenError("You do not have permission to view this report.");
     }
   },
 
@@ -415,10 +415,10 @@ module.exports = {
         where: { user_id: user.id }
       });
       if (!authorityUser || authorityUser.authority_id !== report.authority_id) {
-        throw toForbiddenError("You cannot update issues outside your department.");
+        throw toForbiddenError("You can only update issues assigned to your authority.");
       }
     } else if (user.role !== "admin") {
-      throw toForbiddenError("Only authority or admin can update the issue status.");
+      throw toForbiddenError("Only authority users or administrators can update issue status.");
     }
 
     return sequelize.transaction(async (transaction) => {

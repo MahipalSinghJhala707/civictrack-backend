@@ -143,7 +143,7 @@ describe('City Scope Utility', () => {
     it('should throw when neither cityId nor includeAllCities is provided', () => {
       expect(() => {
         validateCityScope({ adminCityId: null, includeAllCities: false });
-      }).toThrow(/City scope required/);
+      }).toThrow(/Please select a city/);
     });
 
     it('should throw with status code 400', () => {

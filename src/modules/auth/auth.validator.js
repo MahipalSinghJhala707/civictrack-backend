@@ -19,7 +19,7 @@ exports.loginValidator = [
     .optional()
     .custom((value) => {
       if (!VALID_ROLES.includes(value)) {
-        throw new Error("Invalid role selected");
+        throw new Error("Please select a valid role: citizen, authority, or admin.");
       }
       return true;
     })

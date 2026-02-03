@@ -116,7 +116,7 @@ module.exports = {
 
     const existing = await AuthorityUser.findOne({ where: { user_id: userId } });
     if (existing) {
-      throw httpError("This user is already linked to an authority.", 409);
+      throw httpError("This user is already assigned to an authority.", 409);
     }
 
     const authorityUser = await AuthorityUser.create({
