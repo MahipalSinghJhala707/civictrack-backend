@@ -6,6 +6,7 @@ const {
   UserRole,
   Authority,
   AuthorityUser,
+  City,
   sequelize
 } = require("../../../models");
 
@@ -29,6 +30,15 @@ const roleInclude = {
   attributes: ["id", "name", "description"],
   through: { attributes: [] }
   // paranoid: true is default - soft-deleted roles excluded
+};
+
+/**
+ * City include for user queries
+ */
+const cityInclude = {
+  model: City,
+  as: "city",
+  attributes: ["id", "name"]
 };
 
 const sanitizeRoleIds = (roleIds = []) => {
@@ -64,7 +74,7 @@ module.exports = {
 
     const { rows, count } = await User.findAndCountAll({
       where: whereClause,
-      include: [roleInclude],
+      include: [roleInclude, cityInclude],
       ...paginationOptions,
       ...paranoidOptions, // Apply paranoid options from admin context
       distinct: true
@@ -197,6 +207,18 @@ module.exports = {
       if (!authority) {
         throw httpError("Selected authority does not exist.", 404);
       }
+      // Validate user's city matches authority's city (if both have city assigned)
+      // If user has no city, allow assignment but the user should be assigned to a city
+      // Convert to numbers for consistent comparison (handles string vs number type mismatch)
+      const userCityIdNum = user.city_id ? parseInt(user.city_id, 10) : null;
+      const authCityIdNum = authority.city_id ? parseInt(authority.city_id, 10) : null;
+      if (userCityIdNum && authCityIdNum && userCityIdNum !== authCityIdNum) {
+        throw httpError("User's city must match the authority's city. Please select an authority from the same city as the user.", 422);
+      }
+      // If user has no city but authority does, auto-assign user's city from authority
+      if (!user.city_id && authority.city_id) {
+        await user.update({ city_id: authority.city_id });
+      }
     }
 
     return sequelize.transaction(async (transaction) => {
@@ -216,7 +238,7 @@ module.exports = {
       await UserRole.bulkCreate(userRoles, { transaction });
 
       // Handle authority_user mapping
-      // Always remove existing mapping first
+      // Always remove existing mapping first (including soft-deleted records)
       await AuthorityUser.destroy({
         where: { user_id: userId },
         force: true,
@@ -225,10 +247,20 @@ module.exports = {
 
       // If user has authority role, create new mapping
       if (hasAuthorityRole && normalizedAuthorityId) {
-        await AuthorityUser.create({
-          user_id: userId,
-          authority_id: normalizedAuthorityId
-        }, { transaction });
+        // Parse authorityId to ensure it's a number
+        const authorityIdNum = parseInt(normalizedAuthorityId, 10);
+        console.log(`Creating authority_user link: user_id=${userId}, authority_id=${authorityIdNum}`);
+        
+        try {
+          await AuthorityUser.create({
+            user_id: userId,
+            authority_id: authorityIdNum
+          }, { transaction });
+          console.log(`Successfully created authority_user link for user ${userId}`);
+        } catch (createErr) {
+          console.error(`Failed to create authority_user link:`, createErr.message);
+          throw createErr;
+        }
       }
 
       return User.findByPk(userId, {
