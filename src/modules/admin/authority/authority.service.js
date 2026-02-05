@@ -1,4 +1,4 @@
-const { Authority, Department, AuthorityIssue, Issue, sequelize } = require("../../../models");
+const { Authority, Department, AuthorityIssue, Issue, City, sequelize } = require("../../../models");
 const httpError = require("../../../shared/utils/httpError.js");
 const { validateCityScope, applyCityFilter, buildParanoidOptions } = require("../../../shared/utils/cityScope.js");
 const {
@@ -75,9 +75,20 @@ module.exports = {
   async createAuthority(payload) {
     await ensureDepartmentExists(payload.departmentId);
 
+    // Get city name from city_id
+    let cityName = payload.city || '';
+    if (payload.cityId) {
+      const city = await City.findByPk(payload.cityId);
+      if (!city) {
+        throw httpError("The selected city was not found.", 404);
+      }
+      cityName = city.name;
+    }
+
     const authority = await Authority.create({
       name: payload.name,
-      city: payload.city,
+      city: cityName,
+      city_id: payload.cityId || null,
       region: payload.region,
       department_id: payload.departmentId || null,
       address: payload.address || null
@@ -98,9 +109,26 @@ module.exports = {
       await ensureDepartmentExists(payload.departmentId);
     }
 
+    // Get city name from city_id if provided
+    let cityName = payload.city ?? authority.city;
+    let cityId = authority.city_id;
+    if (payload.cityId !== undefined) {
+      if (payload.cityId) {
+        const city = await City.findByPk(payload.cityId);
+        if (!city) {
+          throw httpError("The selected city was not found.", 404);
+        }
+        cityName = city.name;
+        cityId = payload.cityId;
+      } else {
+        cityId = null;
+      }
+    }
+
     await authority.update({
       name: payload.name ?? authority.name,
-      city: payload.city ?? authority.city,
+      city: cityName,
+      city_id: cityId,
       region: payload.region ?? authority.region,
       department_id:
         payload.departmentId !== undefined

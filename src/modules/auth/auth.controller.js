@@ -46,7 +46,15 @@ module.exports = {
       return res.status(200).json({
         success: true,
         message: "Login successful.",
-        data: { user }
+        data: { 
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: req.body.role, // Include the active role that was used for login
+            city_id: user.city_id
+          }
+        }
       });
     } catch (err) {
       next(err);
@@ -73,9 +81,45 @@ module.exports = {
 
   async me(req, res, next) {
     try {
+      // Fetch full user details including roles
+      const { User, Role, City } = require("../../models");
+      const user = await User.findByPk(req.user.id, {
+        attributes: ["id", "name", "email", "city_id"],
+        include: [
+          {
+            model: Role,
+            as: "roles",
+            attributes: ["id", "name"],
+            through: { attributes: [] }
+          },
+          {
+            model: City,
+            as: "city",
+            attributes: ["id", "name"]
+          }
+        ]
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found"
+        });
+      }
+
       return res.status(200).json({
         success: true,
-        data: { user: req.user }
+        data: { 
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: req.user.role, // Current active role from token
+            roles: user.roles,
+            city_id: user.city_id,
+            city: user.city
+          }
+        }
       });
     } catch (err) {
       next(err);

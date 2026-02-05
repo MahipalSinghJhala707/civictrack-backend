@@ -321,6 +321,18 @@ module.exports = {
       };
     }
 
+    // Server-side search - searches title, description, region, and city name
+    if (filters.search && filters.search.trim()) {
+      const searchTerm = `%${filters.search.trim()}%`;
+      whereClause[Op.or] = [
+        { title: { [Op.iLike]: searchTerm } },
+        { description: { [Op.iLike]: searchTerm } },
+        { region: { [Op.iLike]: searchTerm } },
+        // Search by city name using association syntax (safe from SQL injection)
+        { '$city.name$': { [Op.iLike]: searchTerm } }
+      ];
+    }
+
     // Default paranoid options (only admins can override)
     let paranoidOptions = {};
 
