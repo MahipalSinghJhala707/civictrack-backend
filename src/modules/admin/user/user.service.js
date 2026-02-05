@@ -1,8 +1,11 @@
 const bcrypt = require("bcrypt");
+const { Op } = require("sequelize");
 const {
   User,
   Role,
   UserRole,
+  Authority,
+  AuthorityUser,
   sequelize
 } = require("../../../models");
 
@@ -137,24 +140,63 @@ module.exports = {
     });
   },
 
-  async updateUserRoles(userId, roleIds = []) {
+  async updateUserRoles(userId, roleIds = [], authorityId = null) {
     const user = await User.findByPk(userId);
     if (!user) {
       throw httpError("User not found.", 404);
     }
 
-    const rolesToAssign = sanitizeRoleIds(roleIds);
-
-    if (!rolesToAssign.length) {
-      throw httpError("roleIds must contain at least one value.", 422);
+    // Validate roleIds is an array
+    if (!Array.isArray(roleIds)) {
+      throw httpError("roleIds must be an array.", 422);
     }
 
+    // Sanitize, convert to numbers, and deduplicate
+    const sanitizedRoleIds = [...new Set(
+      roleIds
+        .map(id => parseInt(id, 10))
+        .filter(id => !isNaN(id) && id > 0)
+    )];
+
+    if (!sanitizedRoleIds.length) {
+      throw httpError("roleIds must contain at least one valid role ID.", 422);
+    }
+
+    // Find all requested roles using explicit Op.in
     const foundRoles = await Role.findAll({
-      where: { id: rolesToAssign }
+      where: { id: { [Op.in]: sanitizedRoleIds } }
     });
 
-    if (foundRoles.length !== rolesToAssign.length) {
-      throw httpError("One or more roles do not exist.", 404);
+    if (foundRoles.length !== sanitizedRoleIds.length) {
+      throw httpError("One or more selected roles do not exist.", 404);
+    }
+
+    // Filter out admin role - admin role cannot be assigned via this API
+    const adminRole = foundRoles.find(r => r.name === "admin");
+    if (adminRole) {
+      throw httpError("Admin role cannot be assigned from this interface.", 403);
+    }
+
+    // Final roles to assign (after filtering)
+    const rolesToAssign = sanitizedRoleIds;
+
+    // Check if authority role is being assigned
+    const authorityRole = foundRoles.find(r => r.name === "authority");
+    const hasAuthorityRole = !!authorityRole;
+
+    // Normalize authorityId (support both authorityId and authority field names)
+    const normalizedAuthorityId = authorityId || null;
+
+    // Validate authority requirement ONLY if authority role is being assigned
+    if (hasAuthorityRole) {
+      if (!normalizedAuthorityId) {
+        throw httpError("Authority role requires selecting an authority.", 422);
+      }
+      // Validate authority exists and is not soft-deleted
+      const authority = await Authority.findByPk(normalizedAuthorityId);
+      if (!authority) {
+        throw httpError("Selected authority does not exist.", 404);
+      }
     }
 
     return sequelize.transaction(async (transaction) => {
@@ -172,6 +214,22 @@ module.exports = {
       }));
 
       await UserRole.bulkCreate(userRoles, { transaction });
+
+      // Handle authority_user mapping
+      // Always remove existing mapping first
+      await AuthorityUser.destroy({
+        where: { user_id: userId },
+        force: true,
+        transaction
+      });
+
+      // If user has authority role, create new mapping
+      if (hasAuthorityRole && normalizedAuthorityId) {
+        await AuthorityUser.create({
+          user_id: userId,
+          authority_id: normalizedAuthorityId
+        }, { transaction });
+      }
 
       return User.findByPk(userId, {
         include: [roleInclude],

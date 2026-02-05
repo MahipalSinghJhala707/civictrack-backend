@@ -45,7 +45,11 @@ exports.updateUserRolesValidator = [
     .withMessage("roleIds must be a non-empty array"),
   body("roleIds.*")
     .isInt({ min: 1 })
-    .withMessage("roleIds must contain numeric ids")
+    .withMessage("roleIds must contain numeric ids"),
+  body("authorityId")
+    .optional({ nullable: true })
+    .isInt({ min: 1 })
+    .withMessage("authorityId must be a valid numeric id")
 ];
 
 exports.changeUserPasswordValidator = [

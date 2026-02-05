@@ -48,7 +48,10 @@ module.exports = {
   async updateUserRoles(req, res, next) {
     try {
       const userId = Number(req.params.userId);
-      const user = await UserService.updateUserRoles(userId, req.body.roleIds);
+      const { roleIds } = req.body;
+      // Normalize authorityId - support both authorityId and authority field names
+      const authorityId = req.body.authorityId || req.body.authority || null;
+      const user = await UserService.updateUserRoles(userId, roleIds, authorityId);
       res.status(200).json({
         success: true,
         message: "User roles updated successfully.",
