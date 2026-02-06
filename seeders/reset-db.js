@@ -39,16 +39,13 @@ async function resetDatabase() {
       DO $$ DECLARE
         r RECORD;
       BEGIN
-        -- Disable triggers temporarily
-        EXECUTE 'SET session_replication_role = replica';
-        
-        -- Drop all tables in public schema
+        -- Drop all tables in public schema with CASCADE (no superuser needed)
         FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
           EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE';
           RAISE NOTICE 'Dropped table: %', r.tablename;
         END LOOP;
-        
-        -- Drop all enum types
+
+        -- Drop all enum types with CASCADE (covers dependent defaults)
         FOR r IN (
           SELECT typname FROM pg_type t 
           JOIN pg_namespace n ON t.typnamespace = n.oid 
@@ -57,9 +54,6 @@ async function resetDatabase() {
           EXECUTE 'DROP TYPE IF EXISTS public.' || quote_ident(r.typname) || ' CASCADE';
           RAISE NOTICE 'Dropped enum: %', r.typname;
         END LOOP;
-        
-        -- Re-enable triggers
-        EXECUTE 'SET session_replication_role = DEFAULT';
       END $$;
     `);
 
