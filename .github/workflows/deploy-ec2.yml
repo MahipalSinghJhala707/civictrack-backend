@@ -29,12 +29,12 @@ jobs:
             # Root directory for the repo on the EC2 instance
             APP_ROOT=/var/www/civicktrack
 
-            # Clone repo if it doesn't exist yet
+            # Clone repo if it doesn't exist yet (use HTTPS to avoid SSH key issues on EC2)
             if [ ! -d "$APP_ROOT/.git" ]; then
               sudo mkdir -p /var/www
               sudo chown -R $USER:$USER /var/www
               cd /var/www
-              git clone git@github.com:${{ github.repository }}.git civicktrack
+              git clone https://github.com/${{ github.repository }}.git civicktrack
             fi
 
             cd $APP_ROOT
