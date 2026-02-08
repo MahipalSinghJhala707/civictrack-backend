@@ -19,11 +19,9 @@
 
 name: CI
 
+# Disabled automatic triggers; CI can be run manually if needed
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 # Cancel in-progress runs for the same branch
 concurrency:

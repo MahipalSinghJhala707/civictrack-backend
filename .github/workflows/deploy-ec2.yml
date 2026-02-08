@@ -1,0 +1,95 @@
+name: Deploy Backend to EC2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'civictrack-backend/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository (for reference only)
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH to EC2
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+
+            # Root directory for the repo on the EC2 instance
+            APP_ROOT=/var/www/civicktrack
+
+            # Clone repo if it doesn't exist yet
+            if [ ! -d "$APP_ROOT/.git" ]; then
+              sudo mkdir -p /var/www
+              sudo chown -R $USER:$USER /var/www
+              cd /var/www
+              git clone git@github.com:${{ github.repository }}.git civicktrack
+            fi
+
+            cd $APP_ROOT
+
+            # Ensure we're on main and up to date
+            git fetch --all
+            git checkout main
+            git pull origin main
+
+            # Backend directory
+            cd civictrack-backend
+
+            # -----------------------------------------------------------------
+            # Export application configuration from GitHub Actions secrets
+            # Nothing sensitive is stored in files on the EC2 instance.
+            # -----------------------------------------------------------------
+            export NODE_ENV=production
+
+            # Database (Aiven PostgreSQL)
+            export DB_HOST='${{ secrets.DB_HOST }}'
+            export DB_PORT='${{ secrets.DB_PORT }}'
+            export DB_NAME='${{ secrets.DB_NAME }}'
+            export DB_USER='${{ secrets.DB_USER }}'
+            export DB_PASS='${{ secrets.DB_PASS }}'
+
+            # JWT / auth
+            export JWT_SECRET='${{ secrets.JWT_SECRET }}'
+            export JWT_SALT='${{ secrets.JWT_SALT }}'
+
+            # CORS / frontend origin
+            export FRONTEND_ORIGIN='${{ secrets.FRONTEND_ORIGIN }}'
+
+            # AWS S3 (for issue images)
+            export AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
+            export AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+            export AWS_S3_BUCKET='${{ secrets.AWS_S3_BUCKET }}'
+            export AWS_REGION='${{ secrets.AWS_REGION }}'
+            export AWS_S3_ACL='${{ secrets.AWS_S3_ACL }}'
+            export MAX_ISSUE_IMAGES='${{ secrets.MAX_ISSUE_IMAGES }}'
+
+            # Server port (optional, defaults to 4000 if not set)
+            export PORT='${{ secrets.PORT }}'
+
+            # Install dependencies
+            npm ci --omit=dev || npm ci
+
+            # Run database migrations (uses env vars exported above)
+            npm run db:migrate
+
+            # Restart backend using pm2 (must be installed & configured on EC2)
+            if pm2 list | grep -q "civictrack-backend"; then
+              pm2 reload civictrack-backend --update-env
+            else
+              pm2 start server.js --name civictrack-backend
+            fi
+
+            # Save pm2 process list so it restarts on reboot
+            pm2 save
