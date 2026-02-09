@@ -39,13 +39,10 @@ jobs:
 
             cd $APP_ROOT
 
-            # Ensure we're on main and up to date
+            # Ensure we're on main and up to date (backend is at repo root)
             git fetch --all
             git checkout main
             git pull origin main
-
-            # Backend directory (expects env/.env already configured on EC2)
-            cd civictrack-backend
 
             # Install dependencies
             npm ci --omit=dev || npm ci
